@@ -40,7 +40,7 @@ export default function Schedule({ toast }) {
       group_name: s.volunteers?.group_name
     })))
   }, [currentDate])
-fetchShifts
+
   useEffect(() => { fetchShifts() }, [fetchShifts])
 
   useEffect(() => {
@@ -52,6 +52,7 @@ fetchShifts
     const key = format(date, 'yyyy-MM-dd')
     return shifts.filter(s => s.date === key)
   }
+
   async function handleExport() {
     const from = format(startOfMonth(currentDate), 'yyyy-MM-dd')
     const to = format(endOfMonth(currentDate), 'yyyy-MM-dd')
@@ -127,19 +128,20 @@ fetchShifts
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-    <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between">
-  <h1 className="text-base font-semibold text-gray-800">排班管理</h1>
-  <div className="flex items-center gap-3">
-    <p className="text-xs text-gray-400">點擊班次可編輯，拖曳可移動日期</p>
-    <button onClick={handleExport} className="btn btn-success">
-      <Download className="w-4 h-4" />匯出 Excel
-    </button>
-  </div>
-</div>
+      <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between gap-2">
+        <h1 className="text-base font-semibold text-gray-800 shrink-0">排班管理</h1>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <p className="text-xs text-gray-400 hidden md:block">點擊班次可編輯，拖曳可移動日期</p>
+          <button onClick={handleExport} className="btn btn-success text-xs">
+            <Download className="w-4 h-4" />匯出 Excel
+          </button>
+        </div>
+      </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-5">
         <div className="card">
-          <div className="flex items-center justify-between mb-4">
+          {/* 月份切換 */}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="btn btn-ghost p-1.5">
                 <ChevronLeft className="w-4 h-4" />
@@ -159,53 +161,58 @@ fetchShifts
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-lg overflow-hidden">
-            {DAYS.map(d => (
-              <div key={d} className="bg-gray-50 text-center text-xs text-gray-400 font-medium py-2">{d}</div>
-            ))}
-            {Array(startPad).fill(null).map((_, i) => (
-              <div key={`pad-${i}`} className="bg-gray-50 min-h-24" />
-            ))}
-            {days.map(day => {
-              const dayShifts = shiftsForDay(day)
-              const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-              return (
-                <div key={day.toString()}
-                  className={`bg-white min-h-24 p-1.5 transition-colors ${isToday ? 'bg-blue-50/50' : ''}`}
-                  onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('bg-blue-50') }}
-                  onDragLeave={e => e.currentTarget.classList.remove('bg-blue-50')}
-                  onDrop={e => handleDrop(day, e)}
-                >
-                  <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
-                    ${isToday ? 'bg-blue-500 text-white' : 'text-gray-600'}`}>
-                    {day.getDate()}
-                  </div>
-                  {dayShifts.map(s => (
-                    <div key={s.id}
-                      draggable
-                      onDragStart={() => setDragShift(s)}
-                      onDragEnd={() => setDragShift(null)}
-                      onClick={() => openEdit(s)}
-                      className={`text-[11px] px-1.5 py-0.5 rounded mb-0.5 cursor-pointer hover:opacity-80 ${GROUP_CLASS[s.group_name] || 'bg-gray-50 text-gray-600'}`}
+          {/* 月曆：手機可橫向滑動 */}
+          <div className="overflow-x-auto">
+            <div className="min-w-[560px]">
+              <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-lg overflow-hidden">
+                {DAYS.map(d => (
+                  <div key={d} className="bg-gray-50 text-center text-xs text-gray-400 font-medium py-2">{d}</div>
+                ))}
+                {Array(startPad).fill(null).map((_, i) => (
+                  <div key={`pad-${i}`} className="bg-gray-50 min-h-24" />
+                ))}
+                {days.map(day => {
+                  const dayShifts = shiftsForDay(day)
+                  const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+                  return (
+                    <div key={day.toString()}
+                      className={`bg-white min-h-24 p-1.5 transition-colors ${isToday ? 'bg-blue-50/50' : ''}`}
+                      onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('bg-blue-50') }}
+                      onDragLeave={e => e.currentTarget.classList.remove('bg-blue-50')}
+                      onDrop={e => handleDrop(day, e)}
                     >
-                      <span className="font-medium">{s.time_start?.slice(0, 5)}–{s.time_end?.slice(0, 5)}</span>
-                      <span className="ml-1">{s.volunteer_name}</span>
+                      <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
+                        ${isToday ? 'bg-blue-500 text-white' : 'text-gray-600'}`}>
+                        {day.getDate()}
+                      </div>
+                      {dayShifts.map(s => (
+                        <div key={s.id}
+                          draggable
+                          onDragStart={() => setDragShift(s)}
+                          onDragEnd={() => setDragShift(null)}
+                          onClick={() => openEdit(s)}
+                          className={`text-[11px] px-1.5 py-0.5 rounded mb-0.5 cursor-pointer hover:opacity-80 ${GROUP_CLASS[s.group_name] || 'bg-gray-50 text-gray-600'}`}
+                        >
+                          <span className="font-medium">{s.time_start?.slice(0, 5)}–{s.time_end?.slice(0, 5)}</span>
+                          <span className="ml-1">{s.volunteer_name}</span>
+                        </div>
+                      ))}
+                      <button onClick={() => openAdd(day)}
+                        className="w-full text-[10px] text-gray-300 hover:text-gray-500 hover:bg-gray-50 rounded py-0.5 mt-0.5 transition-colors">
+                        + 新增
+                      </button>
                     </div>
-                  ))}
-                  <button onClick={() => openAdd(day)}
-                    className="w-full text-[10px] text-gray-300 hover:text-gray-500 hover:bg-gray-50 rounded py-0.5 mt-0.5 transition-colors">
-                    + 新增
-                  </button>
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {modal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-80">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-semibold text-sm">{modal.mode === 'add' ? '新增班次' : '編輯班次'}</h3>

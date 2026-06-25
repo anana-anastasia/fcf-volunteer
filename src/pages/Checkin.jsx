@@ -87,13 +87,15 @@ export default function Checkin() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between">
         <h1 className="text-base font-semibold text-gray-800">簽到系統</h1>
         <span className="text-xs text-gray-400">今日：{today}</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
-        <div className="grid grid-cols-2 gap-4">
+      <div className="flex-1 overflow-y-auto p-4 md:p-5">
+        {/* 手機單欄，桌機雙欄 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 左欄 */}
           <div className="space-y-4">
             <div className="card">
               <div className="font-medium text-sm text-gray-700 mb-3">今日班表 — 點擊簽到／簽退</div>
@@ -112,23 +114,23 @@ export default function Checkin() {
                     const checkedOut = !!ci?.checked_out_at
                     return (
                       <div key={s.id}
-                        className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border transition-all
                           ${checkedOut ? 'bg-gray-50 border-gray-200'
                           : checkedIn ? 'bg-green-50 border-green-200'
                           : 'border-gray-100'}`}>
                         <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium text-gray-600 flex-shrink-0">
                           {s.volunteer_name?.[0]}
                         </div>
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-800">{s.volunteer_name}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-800 truncate">{s.volunteer_name}</div>
                           <div className="text-xs text-gray-400">
                             {s.time_start?.slice(0, 5)}–{s.time_end?.slice(0, 5)}
                           </div>
                         </div>
-                        <span className={`badge ${GROUP_BADGE[s.group_name] || 'badge-gray'}`}>
+                        <span className={`badge ${GROUP_BADGE[s.group_name] || 'badge-gray'} hidden sm:inline-flex`}>
                           {s.group_name}
                         </span>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1 flex-shrink-0">
                           {!checkedIn ? (
                             <button onClick={() => handleCheckin(s)}
                               className="btn btn-primary text-xs py-1 px-2">
@@ -164,6 +166,7 @@ export default function Checkin() {
             </div>
           </div>
 
+          {/* 右欄：今日簽到紀錄 */}
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <span className="font-medium text-sm text-gray-700">今日簽到紀錄</span>
@@ -174,21 +177,21 @@ export default function Checkin() {
             ) : (
               <div className="space-y-1.5">
                 {checkins.map(c => (
-                  <div key={c.id} className="flex items-center gap-2.5 py-2 border-b border-gray-50">
-                    <div className="text-xs text-gray-400 w-24">
+                  <div key={c.id} className="flex items-center gap-2 py-2 border-b border-gray-50">
+                    <div className="text-xs text-gray-400 w-20 flex-shrink-0">
                       <div>到 {c.checked_in_at ? format(new Date(c.checked_in_at), 'HH:mm') : '—'}</div>
                       {c.checked_out_at && (
                         <div>退 {format(new Date(c.checked_out_at), 'HH:mm')}</div>
                       )}
                     </div>
-                    <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                    <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 flex-shrink-0">
                       {c.volunteer_name?.[0]}
                     </div>
-                    <span className="flex-1 text-sm">{c.volunteer_name}</span>
-                    <span className={`badge ${GROUP_BADGE[c.group_name] || 'badge-gray'} text-[10px]`}>
+                    <span className="flex-1 text-sm truncate">{c.volunteer_name}</span>
+                    <span className={`badge ${GROUP_BADGE[c.group_name] || 'badge-gray'} text-[10px] hidden sm:inline-flex`}>
                       {c.group_name}
                     </span>
-                    <span className={`badge ${c.checked_out_at ? 'badge-gray' : 'badge-green'} text-[10px]`}>
+                    <span className={`badge ${c.checked_out_at ? 'badge-gray' : 'badge-green'} text-[10px] flex-shrink-0`}>
                       {c.checked_out_at ? '已簽退' : '服務中'}
                     </span>
                   </div>

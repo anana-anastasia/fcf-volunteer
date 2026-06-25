@@ -112,14 +112,14 @@ export default function Courses() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between">
         <h1 className="text-base font-semibold text-gray-800">在職教育</h1>
-        <button onClick={() => setShowAddCourse(true)} className="btn btn-primary">
+        <button onClick={() => setShowAddCourse(true)} className="btn btn-primary text-xs">
           <Plus className="w-4 h-4" />建立課程
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-4 md:p-5">
         <div className="flex border-b border-gray-100 mb-4">
           {TABS.map((t, i) => (
             <button key={t} onClick={() => { setTab(i); setSelectedCourse(null) }}
@@ -131,9 +131,9 @@ export default function Courses() {
           ))}
         </div>
 
-        {/* 課程總覽 */}
+        {/* 課程總覽：手機單欄，桌機雙欄 */}
         {tab === 0 && !selectedCourse && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {courses.length === 0 && (
               <p className="text-sm text-gray-400 col-span-2 text-center py-8">尚無課程，請點右上角建立課程</p>
             )}
@@ -169,77 +169,79 @@ export default function Courses() {
         {/* 課程報名詳情 */}
         {tab === 0 && selectedCourse && (
           <div>
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
               <button onClick={() => setSelectedCourse(null)} className="btn btn-ghost py-1">
                 <ArrowLeft className="w-4 h-4" /> 返回
               </button>
               <span className="font-semibold text-gray-800">{selectedCourse.title}</span>
               {selectedCourse.date && <span className="badge badge-gray">{selectedCourse.date}</span>}
-              {selectedCourse.instructor && <span className="badge badge-gray">{selectedCourse.instructor}</span>}
+              {selectedCourse.instructor && <span className="badge badge-gray hidden sm:inline-flex">{selectedCourse.instructor}</span>}
               <div className="flex-1" />
-              <button onClick={() => exportCourseEnrollments(selectedCourse, enrollments)} className="btn btn-success">
-  <Download className="w-3.5 h-3.5" />匯出名單
-</button>
+              <button onClick={() => exportCourseEnrollments(selectedCourse, enrollments)} className="btn btn-success text-xs">
+                <Download className="w-3.5 h-3.5" />匯出名單
+              </button>
               {adminUnlocked ? (
                 <>
-                  <button onClick={() => deleteCourse(selectedCourse.id)} className="btn btn-danger">
+                  <button onClick={() => deleteCourse(selectedCourse.id)} className="btn btn-danger text-xs">
                     <Trash2 className="w-3.5 h-3.5" />刪除課程
                   </button>
-                  <button onClick={() => setAdminUnlocked(false)} className="btn btn-secondary text-xs">登出管理員</button>
+                  <button onClick={() => setAdminUnlocked(false)} className="btn btn-secondary text-xs">登出</button>
                 </>
               ) : (
                 <button onClick={() => setShowAdminModal(true)} className="btn btn-secondary text-xs">🔒 管理員</button>
               )}
             </div>
             <div className="card">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <span className="text-sm text-gray-500">已報名 {enrollments.length} 人 / 名額 {selectedCourse.max_seats} 人</span>
                 <div className="flex gap-2">
-                  <select className="input w-36 text-xs" value={addVolId} onChange={e => setAddVolId(e.target.value)}>
+                  <select className="input w-32 text-xs" value={addVolId} onChange={e => setAddVolId(e.target.value)}>
                     <option value="">新增報名...</option>
                     {volunteers.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                   </select>
                   <button onClick={() => { addEnrollment(addVolId); setAddVolId('') }} className="btn btn-primary text-xs">新增</button>
                 </div>
               </div>
-              <table className="w-full">
-                <thead><tr>
-                  <th className="table-th">#</th>
-                  <th className="table-th">姓名</th>
-                  <th className="table-th">組別</th>
-                  <th className="table-th">報名日期</th>
-                  <th className="table-th">出席</th>
-                  <th className="table-th"></th>
-                </tr></thead>
-                <tbody>
-                  {enrollments.length === 0 ? (
-                    <tr><td colSpan={6} className="table-td text-center text-gray-400 py-6">尚無報名紀錄</td></tr>
-                  ) : enrollments.map((e, i) => (
-                    <tr key={e.id}>
-                      <td className="table-td text-gray-400">{i + 1}</td>
-                      <td className="table-td font-medium">{e.volunteer_name}</td>
-                      <td className="table-td"><span className="badge badge-gray text-xs">{e.group_name}</span></td>
-                      <td className="table-td text-gray-400">
-                        {e.enrolled_at ? format(new Date(e.enrolled_at), 'yyyy/MM/dd') : '—'}
-                      </td>
-                      <td className="table-td">
-                        <button onClick={() => toggleAttended(e.id, e.attended)}
-                          className={`badge cursor-pointer ${e.attended ? 'badge-green' : 'badge-gray'}`}>
-                          {e.attended ? '✓ 已出席' : '未出席'}
-                        </button>
-                      </td>
-                      <td className="table-td">
-                        {adminUnlocked && (
-                          <button onClick={() => deleteEnrollment(e.id)}
-                            className="p-1 text-gray-300 hover:text-red-500">
-                            <Trash2 className="w-3.5 h-3.5" />
+              <div className="overflow-x-auto">
+                <table className="w-full" style={{ minWidth: '420px' }}>
+                  <thead><tr>
+                    <th className="table-th">#</th>
+                    <th className="table-th">姓名</th>
+                    <th className="table-th hidden sm:table-cell">組別</th>
+                    <th className="table-th hidden sm:table-cell">報名日期</th>
+                    <th className="table-th">出席</th>
+                    <th className="table-th"></th>
+                  </tr></thead>
+                  <tbody>
+                    {enrollments.length === 0 ? (
+                      <tr><td colSpan={6} className="table-td text-center text-gray-400 py-6">尚無報名紀錄</td></tr>
+                    ) : enrollments.map((e, i) => (
+                      <tr key={e.id}>
+                        <td className="table-td text-gray-400">{i + 1}</td>
+                        <td className="table-td font-medium">{e.volunteer_name}</td>
+                        <td className="table-td hidden sm:table-cell"><span className="badge badge-gray text-xs">{e.group_name}</span></td>
+                        <td className="table-td hidden sm:table-cell text-gray-400">
+                          {e.enrolled_at ? format(new Date(e.enrolled_at), 'yyyy/MM/dd') : '—'}
+                        </td>
+                        <td className="table-td">
+                          <button onClick={() => toggleAttended(e.id, e.attended)}
+                            className={`badge cursor-pointer ${e.attended ? 'badge-green' : 'badge-gray'}`}>
+                            {e.attended ? '✓ 已出席' : '未出席'}
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                        <td className="table-td">
+                          {adminUnlocked && (
+                            <button onClick={() => deleteEnrollment(e.id)}
+                              className="p-1 text-gray-300 hover:text-red-500">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -248,22 +250,24 @@ export default function Courses() {
         {tab === 1 && (
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <select className="input w-48" value={selectedVol} onChange={e => fetchPersonal(e.target.value)}>
+              <select className="input w-full md:w-48" value={selectedVol} onChange={e => fetchPersonal(e.target.value)}>
                 <option value="">— 選擇志工 —</option>
                 {volunteers.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
             {selectedVol && (
               <>
-                <div className="grid grid-cols-3 gap-3 mb-4">
+                {/* 統計：手機三欄小字，桌機正常 */}
+                <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4">
                   {[['已出席課程', completedCount, '門'], ['累計學習時數', totalHours, '小時'], ['尚未出席', personalData.length - completedCount, '門']].map(([label, val, unit]) => (
-                    <div key={label} className="card text-center">
-                      <div className="text-2xl font-semibold text-blue-600">{val}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{label}（{unit}）</div>
+                    <div key={label} className="card text-center p-3 md:p-4">
+                      <div className="text-xl md:text-2xl font-semibold text-blue-600">{val}</div>
+                      <div className="text-[10px] md:text-xs text-gray-400 mt-0.5">{label}<br className="md:hidden" /><span className="hidden md:inline">（{unit}）</span><span className="md:hidden">（{unit}）</span></div>
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                {/* 課程列表：手機單欄，桌機雙欄 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {personalData.map(c => (
                     <div key={c.id} className={`card border-l-4 ${c.attended ? '' : 'opacity-50'}`}
                       style={{ borderLeftColor: c.attended ? c.color : c.completed ? '#93c5fd' : '#e5e7eb' }}>
@@ -289,8 +293,8 @@ export default function Courses() {
 
       {/* 建立課程 Modal */}
       {showAddCourse && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-96">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-sm">建立新課程</h3>
               <button onClick={() => setShowAddCourse(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
@@ -326,8 +330,8 @@ export default function Courses() {
 
       {/* 管理員 Modal */}
       {showAdminModal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-72">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-semibold text-sm">管理員驗證</h3>
               <button onClick={() => { setShowAdminModal(false); setPwInput(''); setPwError('') }}

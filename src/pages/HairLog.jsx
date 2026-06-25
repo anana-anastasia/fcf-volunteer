@@ -46,8 +46,8 @@ export default function HairLog() {
   }
 
   async function handleExport() {
-  await exportHairLogs(logs)
-}
+    await exportHairLogs(logs)
+  }
 
   async function fetchVols() {
     const { data } = await supabase.from('volunteers').select('id, name').order('name')
@@ -112,18 +112,20 @@ export default function HairLog() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between">
-  <h1 className="text-base font-semibold text-gray-800">捐髮工作日誌</h1>
-  <div className="flex items-center gap-2">
-    {adminUnlocked && <span className="badge badge-red">管理員模式</span>}
-    <button onClick={handleExport} className="btn btn-success">
-      <Download className="w-4 h-4" />匯出 Excel
-    </button>
-  </div>
-</div>
+      <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between">
+        <h1 className="text-base font-semibold text-gray-800">捐髮工作日誌</h1>
+        <div className="flex items-center gap-2">
+          {adminUnlocked && <span className="badge badge-red">管理員模式</span>}
+          <button onClick={handleExport} className="btn btn-success text-xs">
+            <Download className="w-4 h-4" />匯出 Excel
+          </button>
+        </div>
+      </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
-        <div className="grid grid-cols-2 gap-4">
+      <div className="flex-1 overflow-y-auto p-4 md:p-5">
+        {/* 手機單欄，桌機雙欄 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 填寫表單 */}
           <div className="card">
             <div className="font-medium text-sm text-gray-700 mb-4">填寫工作日誌</div>
             <div className="space-y-3">
@@ -159,6 +161,7 @@ export default function HairLog() {
             </div>
           </div>
 
+          {/* 日誌紀錄 */}
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between mb-3">
               <span className="font-medium text-sm text-gray-700">日誌紀錄</span>
@@ -186,8 +189,8 @@ export default function HairLog() {
                     <tr><td colSpan={10} className="table-td text-center text-gray-400 py-6">尚無日誌紀錄</td></tr>
                   ) : logs.map(l => (
                     <tr key={l.id}>
-                      <td className="table-td text-gray-500">{l.date}</td>
-                      <td className="table-td font-medium">{l.volunteer_name}</td>
+                      <td className="table-td text-gray-500 whitespace-nowrap">{l.date}</td>
+                      <td className="table-td font-medium whitespace-nowrap">{l.volunteer_name}</td>
                       <td className="table-td">{l.letters || 0}</td>
                       <td className="table-td">{l.excel_count || 0}</td>
                       <td className="table-td">{l.thank_cards || 0}</td>
@@ -211,8 +214,8 @@ export default function HairLog() {
       </div>
 
       {showAdminModal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-72">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-semibold text-sm">管理員驗證</h3>
               <button onClick={() => { setShowAdminModal(false); setPwInput(''); setPwError('') }}
