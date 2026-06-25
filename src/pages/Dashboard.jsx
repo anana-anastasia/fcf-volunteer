@@ -130,7 +130,7 @@ export default function Dashboard() {
           {/* 近期捐髮日誌 */}
           <div className="card">
             <div className="flex items-center justify-between mb-3">
-              <span className="font-medium text-sm text-gray-700">近期捐髮日誌</span>
+              <span className="font-medium text-sm text-gray-700">近期每日日誌</span>
               <button onClick={() => navigate('/hairlog')} className="btn btn-ghost text-xs">查看日誌 →</button>
             </div>
             {recentLogs.length === 0 ? (

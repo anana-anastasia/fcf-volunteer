@@ -113,7 +113,7 @@ export default function HairLog() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between">
-        <h1 className="text-base font-semibold text-gray-800">捐髮工作日誌</h1>
+        <h1 className="text-base font-semibold text-gray-800">每日工作日誌</h1>
         <div className="flex items-center gap-2">
           {adminUnlocked && <span className="badge badge-red">管理員模式</span>}
           <button onClick={handleExport} className="btn btn-success text-xs">

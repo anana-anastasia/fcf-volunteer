@@ -8,7 +8,7 @@ const navItems = [
   { to: '/', label: '總覽', icon: LayoutDashboard, end: true },
   { to: '/schedule', label: '排班管理', icon: Calendar },
   { to: '/checkin', label: '簽到系統', icon: QrCode },
-  { to: '/hairlog', label: '捐髮工作日誌', icon: NotebookText },
+  { to: '/hairlog', label: '每日工作日誌', icon: NotebookText },
   { to: '/courses', label: '在職教育', icon: GraduationCap },
   { to: '/records', label: '服務紀錄', icon: FileText },
   { to: '/volunteers', label: '志工資料管理', icon: Users },

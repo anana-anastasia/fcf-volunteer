@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
-import { CheckCircle2, Search, LogOut } from 'lucide-react'
+import { CheckCircle2, Search, LogOut, Trash2, X } from 'lucide-react'
 
 const GROUP_BADGE = {
   行政: 'badge-purple',
@@ -9,12 +9,19 @@ const GROUP_BADGE = {
   關懷: 'badge-teal'
 }
 
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD
+
 export default function Checkin() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const [todayShifts, setTodayShifts] = useState([])
   const [checkins, setCheckins] = useState([])
   const [search, setSearch] = useState('')
   const [manualName, setManualName] = useState('')
+  const [adminUnlocked, setAdminUnlocked] = useState(false)
+  const [showAdminModal, setShowAdminModal] = useState(false)
+  const [pwInput, setPwInput] = useState('')
+  const [pwError, setPwError] = useState('')
+  const [pendingDeleteId, setPendingDeleteId] = useState(null)
 
   useEffect(() => { fetchData() }, [])
 
@@ -81,6 +88,36 @@ export default function Checkin() {
     fetchData()
   }
 
+  function askDelete(id) {
+    if (adminUnlocked) {
+      confirmDelete(id)
+    } else {
+      setPendingDeleteId(id)
+      setShowAdminModal(true)
+    }
+  }
+
+  async function confirmDelete(id) {
+    if (!confirm('確定刪除此筆簽到紀錄？')) return
+    await supabase.from('checkins').delete().eq('id', id)
+    fetchData()
+  }
+
+  function handleAdminLogin() {
+    if (pwInput === ADMIN_PASSWORD) {
+      setAdminUnlocked(true)
+      setShowAdminModal(false)
+      setPwInput('')
+      setPwError('')
+      if (pendingDeleteId) {
+        confirmDelete(pendingDeleteId)
+        setPendingDeleteId(null)
+      }
+    } else {
+      setPwError('密碼錯誤，請重試')
+    }
+  }
+
   const filtered = todayShifts.filter(s =>
     !search || s.volunteer_name?.includes(search)
   )
@@ -93,7 +130,6 @@ export default function Checkin() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
-        {/* 手機單欄，桌機雙欄 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* 左欄 */}
           <div className="space-y-4">
@@ -170,7 +206,16 @@ export default function Checkin() {
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <span className="font-medium text-sm text-gray-700">今日簽到紀錄</span>
-              <span className="badge badge-blue">已到 {checkins.length} 人</span>
+              <div className="flex items-center gap-2">
+                {adminUnlocked && <span className="badge badge-red">管理員模式</span>}
+                <button onClick={() => {
+                  if (adminUnlocked) setAdminUnlocked(false)
+                  else setShowAdminModal(true)
+                }} className={`btn text-xs ${adminUnlocked ? 'btn-danger' : 'btn-secondary'}`}>
+                  {adminUnlocked ? '登出' : '🔒 管理員'}
+                </button>
+                <span className="badge badge-blue">已到 {checkins.length} 人</span>
+              </div>
             </div>
             {checkins.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-8">今日尚無簽到紀錄</p>
@@ -194,6 +239,12 @@ export default function Checkin() {
                     <span className={`badge ${c.checked_out_at ? 'badge-gray' : 'badge-green'} text-[10px] flex-shrink-0`}>
                       {c.checked_out_at ? '已簽退' : '服務中'}
                     </span>
+                    {adminUnlocked && (
+                      <button onClick={() => askDelete(c.id)}
+                        className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -201,6 +252,29 @@ export default function Checkin() {
           </div>
         </div>
       </div>
+
+      {/* 管理員 Modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-semibold text-sm">管理員驗證</h3>
+              <button onClick={() => { setShowAdminModal(false); setPwInput(''); setPwError('') }}
+                className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">輸入管理員密碼以啟用刪除功能</p>
+            <input type="password" className="input mb-2" placeholder="輸入密碼"
+              value={pwInput} onChange={e => setPwInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdminLogin()} autoFocus />
+            {pwError && <p className="text-xs text-red-500 mb-2">{pwError}</p>}
+            <div className="flex gap-2 mt-3">
+              <button onClick={handleAdminLogin} className="btn btn-primary flex-1 justify-center">確認</button>
+              <button onClick={() => { setShowAdminModal(false); setPwInput(''); setPwError('') }}
+                className="btn btn-secondary">取消</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

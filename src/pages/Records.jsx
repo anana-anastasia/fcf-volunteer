@@ -34,21 +34,40 @@ export default function Records() {
     if (!data) return
     let rows = data.filter(c => c.shifts).map(c => {
       const timeStart = c.shifts?.time_start
-      const timeEnd = c.shifts?.time_end
-      let hours = 0
-      if (timeStart && timeEnd) {
-        const start = new Date('2000-01-01T' + timeStart)
-        const end = new Date('2000-01-01T' + timeEnd)
-        hours = Math.round((end - start) / 3600000)
-      }
-      return {
-        id: c.id, date: c.shifts?.date,
-        volunteer_name: c.volunteers?.name,
-        group_name: c.volunteers?.group_name,
-        time_start: timeStart?.slice(0, 5),
-        time_end: timeEnd?.slice(0, 5),
-        hours, checked_in_at: c.checked_in_at, checked_out_at: c.checked_out_at,
-      }
+const timeEnd = c.shifts?.time_end
+
+function roundToHalf(date) {
+  const m = date.getMinutes()
+  if (m <= 15) {
+    date.setMinutes(0, 0, 0)
+  } else if (m <= 44) {
+    date.setMinutes(30, 0, 0)
+  } else {
+    date.setHours(date.getHours() + 1, 0, 0, 0)
+  }
+  return date
+}
+
+let hours = 0
+let displayStart = timeStart?.slice(0, 5)
+let displayEnd = timeEnd?.slice(0, 5)
+
+if (c.checked_in_at && c.checked_out_at) {
+  const start = roundToHalf(new Date(c.checked_in_at))
+  const end = roundToHalf(new Date(c.checked_out_at))
+  hours = Math.max(0, (end - start) / 3600000)
+  displayStart = start.toTimeString().slice(0, 5)
+  displayEnd = end.toTimeString().slice(0, 5)
+}
+
+return {
+  id: c.id, date: c.shifts?.date,
+  volunteer_name: c.volunteers?.name,
+  group_name: c.volunteers?.group_name,
+  time_start: displayStart,
+  time_end: displayEnd,
+  hours, checked_in_at: c.checked_in_at, checked_out_at: c.checked_out_at,
+}
     })
     if (filter.group !== 'all') rows = rows.filter(r => r.group_name === filter.group)
     if (filter.year !== 'all') rows = rows.filter(r => r.date?.startsWith(filter.year))

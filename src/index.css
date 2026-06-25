@@ -6,6 +6,28 @@
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
   }
+
+  /* 手機字體放大 */
+  @media (max-width: 768px) {
+    html {
+      font-size: 18px;
+    }
+    .table-th {
+      font-size: 13px !important;
+    }
+    .table-td {
+      font-size: 15px !important;
+    }
+    .btn {
+      font-size: 15px !important;
+    }
+    .input {
+      font-size: 16px !important;
+    }
+    .badge {
+      font-size: 13px !important;
+    }
+  }
 }
 
 @layer components {
