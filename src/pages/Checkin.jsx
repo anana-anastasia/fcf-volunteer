@@ -22,8 +22,15 @@ export default function Checkin() {
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState('')
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
+  const [allVolunteers, setAllVolunteers] = useState([])
+  const [showManualList, setShowManualList] = useState(false)
+  const [manualVolId, setManualVolId] = useState('')
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+    supabase.from('volunteers').select('id, name, volunteer_no, phone, group_name').order('name')
+      .then(({ data }) => { if (data) setAllVolunteers(data) })
+  }, [])
 
   async function fetchData() {
     const [{ data: shifts }, { data: ci }] = await Promise.all([
@@ -73,28 +80,20 @@ export default function Checkin() {
   }
 
   const handleManualCheckin = async () => {
-    if (!manualName.trim()) return
-    const { data: vol } = await supabase
-      .from('volunteers')
-      .select('id, name, group_name')
-      .ilike('name', manualName.trim())
-      .single()
-    if (!vol) return alert('找不到此志工，請確認姓名')
+    if (!manualVolId) return alert('請先選擇志工')
     const { error } = await supabase.from('checkins').insert({
-      volunteer_id: vol.id
+      volunteer_id: manualVolId
     })
     if (error) return alert('簽到失敗')
     setManualName('')
+    setManualVolId('')
+    setShowManualList(false)
     fetchData()
   }
 
   function askDelete(id) {
-    if (adminUnlocked) {
-      confirmDelete(id)
-    } else {
-      setPendingDeleteId(id)
-      setShowAdminModal(true)
-    }
+    if (adminUnlocked) { confirmDelete(id) }
+    else { setPendingDeleteId(id); setShowAdminModal(true) }
   }
 
   async function confirmDelete(id) {
@@ -109,10 +108,7 @@ export default function Checkin() {
       setShowAdminModal(false)
       setPwInput('')
       setPwError('')
-      if (pendingDeleteId) {
-        confirmDelete(pendingDeleteId)
-        setPendingDeleteId(null)
-      }
+      if (pendingDeleteId) { confirmDelete(pendingDeleteId); setPendingDeleteId(null) }
     } else {
       setPwError('密碼錯誤，請重試')
     }
@@ -131,8 +127,10 @@ export default function Checkin() {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
           {/* 左欄 */}
           <div className="space-y-4">
+            {/* 今日班表 */}
             <div className="card">
               <div className="font-medium text-sm text-gray-700 mb-3">今日班表 — 點擊簽到／簽退</div>
               <div className="relative mb-3">
@@ -191,14 +189,46 @@ export default function Checkin() {
               )}
             </div>
 
+            {/* 手動簽到 */}
             <div className="card">
               <div className="font-medium text-sm text-gray-700 mb-3">手動簽到</div>
-              <div className="flex gap-2">
-                <input className="input flex-1" placeholder="輸入志工姓名..."
-                  value={manualName} onChange={e => setManualName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleManualCheckin()} />
-                <button onClick={handleManualCheckin} className="btn btn-primary">簽到</button>
+              <div className="relative mb-2">
+                <input className="input" placeholder="搜尋姓名、編號或電話..."
+                  value={manualName}
+                  onChange={e => {
+                    setManualName(e.target.value)
+                    setManualVolId('')
+                    setShowManualList(true)
+                  }} />
+                {manualName && showManualList && (
+                  <div className="absolute z-10 w-full mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
+                    {allVolunteers
+                      .filter(v =>
+                        v.name.includes(manualName) ||
+                        (v.volunteer_no || '').includes(manualName) ||
+                        (v.volunteer_no || '').replace(/\D/g, '').includes(manualName.replace(/\D/g, '')) ||
+                        (v.phone || '').includes(manualName)
+                      )
+                      .map(v => (
+                        <button key={v.id} type="button"
+                          onClick={() => {
+                            setManualName(v.name)
+                            setManualVolId(v.id)
+                            setShowManualList(false)
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+                          <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
+                          <span>{v.name}</span>
+                          <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
+              {manualVolId && (
+                <p className="text-xs text-green-600 mb-2">✓ 已選擇：{manualName}</p>
+              )}
+              <button onClick={handleManualCheckin} className="btn btn-primary w-full justify-center">簽到</button>
             </div>
           </div>
 
@@ -250,6 +280,7 @@ export default function Checkin() {
               </div>
             )}
           </div>
+
         </div>
       </div>
 

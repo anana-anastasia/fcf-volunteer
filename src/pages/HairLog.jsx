@@ -22,7 +22,7 @@ export default function HairLog() {
   const [logs, setLogs] = useState([])
   const [volunteers, setVolunteers] = useState([])
   const [form, setForm] = useState({
-    volunteer_id: '', date: format(new Date(), 'yyyy-MM-dd'),
+  volunteer_id: '', volSearch: '', date: format(new Date(), 'yyyy-MM-dd'),
     letters: '', excel_count: '', print_range: '',
     thank_cards: '', mail_count: '', walkin_count: '',
     phone_calls: '', note: ''
@@ -50,7 +50,7 @@ export default function HairLog() {
   }
 
   async function fetchVols() {
-    const { data } = await supabase.from('volunteers').select('id, name').order('name')
+    const { data } = await supabase.from('volunteers').select('id, name, volunteer_no, phone').order('name')
     if (data) setVolunteers(data)
   }
 
@@ -71,7 +71,7 @@ export default function HairLog() {
     })
     if (error) { alert('送出失敗'); setSubmitting(false); return }
     setForm({
-      volunteer_id: '', date: format(new Date(), 'yyyy-MM-dd'),
+      volunteer_id: '', volSearch: '', date: format(new Date(), 'yyyy-MM-dd'),
       letters: '', excel_count: '', print_range: '',
       thank_cards: '', mail_count: '', walkin_count: '',
       phone_calls: '', note: ''
@@ -130,13 +130,34 @@ export default function HairLog() {
             <div className="font-medium text-sm text-gray-700 mb-4">填寫工作日誌</div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">志工姓名</label>
-                <select className="input" value={form.volunteer_id}
-                  onChange={e => setForm(f => ({ ...f, volunteer_id: e.target.value }))}>
-                  <option value="">— 請選擇 —</option>
-                  {volunteers.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </select>
-              </div>
+  <label className="text-xs font-medium text-gray-600 block mb-1">志工姓名</label>
+  <input className="input mb-1" placeholder="搜尋姓名、編號或電話..."
+  value={form.volSearch || ''}
+  onChange={e => setForm(f => ({ ...f, volSearch: e.target.value, volunteer_id: '', showVolList: true }))} />
+  {form.volSearch && form.showVolList !== false && (
+    <div className="border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+      {volunteers
+        .filter(v =>
+          v.name.includes(form.volSearch) ||
+          (v.volunteer_no || '').includes(form.volSearch) ||
+          (v.volunteer_no || '').replace(/\D/g, '').includes(form.volSearch.replace(/\D/g, '')) ||
+          (v.phone || '').includes(form.volSearch)
+        )
+        .map(v => (
+          <button key={v.id} type="button"
+            onClick={() => setForm(f => ({ ...f, volunteer_id: v.id, volSearch: v.name, showVolList: false }))}
+            className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2
+              ${form.volunteer_id === v.id ? 'bg-blue-50 text-blue-600' : ''}`}>
+            <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
+            <span>{v.name}</span>
+          </button>
+        ))}
+    </div>
+  )}
+  {form.volunteer_id && (
+    <p className="text-xs text-green-600 mt-1">✓ 已選擇：{volunteers.find(v => v.id === form.volunteer_id)?.name}</p>
+  )}
+</div>
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">日期</label>
                 <input type="date" className="input" value={form.date}

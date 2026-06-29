@@ -19,6 +19,10 @@ export default function Courses() {
   const [personalData, setPersonalData] = useState([])
   const [showAddCourse, setShowAddCourse] = useState(false)
   const [addVolId, setAddVolId] = useState('')
+  const [addVolSearch, setAddVolSearch] = useState('')
+  const [showAddVolList, setShowAddVolList] = useState(false)
+  const [personalSearch, setPersonalSearch] = useState('')
+  const [showPersonalList, setShowPersonalList] = useState(false)
   const [courseForm, setCourseForm] = useState({ title: '', date: '', instructor: '', hours: 3, max_seats: 30, color: COLORS[0] })
   const [adminUnlocked, setAdminUnlocked] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
@@ -33,7 +37,7 @@ export default function Courses() {
   }
 
   async function fetchVols() {
-    const { data } = await supabase.from('volunteers').select('id, name, group_name').order('name')
+    const { data } = await supabase.from('volunteers').select('id, name, group_name, volunteer_no, phone').order('name')
     if (data) setVolunteers(data)
   }
 
@@ -107,6 +111,13 @@ export default function Courses() {
     }
   }
 
+  const filterVols = (keyword) => volunteers.filter(v =>
+    v.name.includes(keyword) ||
+    (v.volunteer_no || '').includes(keyword) ||
+    (v.volunteer_no || '').replace(/\D/g, '').includes(keyword.replace(/\D/g, '')) ||
+    (v.phone || '').includes(keyword)
+  )
+
   const completedCount = personalData.filter(c => c.attended).length
   const totalHours = personalData.filter(c => c.attended).reduce((a, c) => a + (c.hours || 0), 0)
 
@@ -131,7 +142,7 @@ export default function Courses() {
           ))}
         </div>
 
-        {/* 課程總覽：手機單欄，桌機雙欄 */}
+        {/* 課程總覽 */}
         {tab === 0 && !selectedCourse && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {courses.length === 0 && (
@@ -194,12 +205,40 @@ export default function Courses() {
             <div className="card">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <span className="text-sm text-gray-500">已報名 {enrollments.length} 人 / 名額 {selectedCourse.max_seats} 人</span>
-                <div className="flex gap-2">
-                  <select className="input w-32 text-xs" value={addVolId} onChange={e => setAddVolId(e.target.value)}>
-                    <option value="">新增報名...</option>
-                    {volunteers.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                  </select>
-                  <button onClick={() => { addEnrollment(addVolId); setAddVolId('') }} className="btn btn-primary text-xs">新增</button>
+                {/* 新增報名搜尋 */}
+                <div className="flex gap-2 items-start">
+                  <div className="relative">
+                    <input className="input w-44 text-xs" placeholder="搜尋姓名、編號或電話..."
+                      value={addVolSearch}
+                      onChange={e => {
+                        setAddVolSearch(e.target.value)
+                        setAddVolId('')
+                        setShowAddVolList(true)
+                      }} />
+                    {addVolSearch && showAddVolList && (
+                      <div className="absolute z-10 w-44 mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
+                        {filterVols(addVolSearch).map(v => (
+                          <button key={v.id} type="button"
+                            onClick={() => {
+                              setAddVolId(v.id)
+                              setAddVolSearch(v.name)
+                              setShowAddVolList(false)
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2
+                              ${addVolId === v.id ? 'bg-blue-50 text-blue-600' : ''}`}>
+                            <span className="text-gray-400 w-10">{v.volunteer_no || '—'}</span>
+                            <span>{v.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {addVolId && <p className="text-xs text-green-600 mt-1">✓ {addVolSearch}</p>}
+                  </div>
+                  <button onClick={() => {
+                    addEnrollment(addVolId)
+                    setAddVolId('')
+                    setAddVolSearch('')
+                  }} className="btn btn-primary text-xs">新增</button>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -249,15 +288,36 @@ export default function Courses() {
         {/* 個人紀錄 */}
         {tab === 1 && (
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <select className="input w-full md:w-48" value={selectedVol} onChange={e => fetchPersonal(e.target.value)}>
-                <option value="">— 選擇志工 —</option>
-                {volunteers.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-              </select>
+            <div className="relative w-full md:w-64 mb-4">
+              <input className="input" placeholder="搜尋志工姓名、編號或電話..."
+                value={personalSearch}
+                onChange={e => {
+                  setPersonalSearch(e.target.value)
+                  setSelectedVol('')
+                  setPersonalData([])
+                  setShowPersonalList(true)
+                }} />
+              {personalSearch && showPersonalList && (
+                <div className="absolute z-10 w-full mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
+                  {filterVols(personalSearch).map(v => (
+                    <button key={v.id} type="button"
+                      onClick={() => {
+                        setPersonalSearch(v.name)
+                        setShowPersonalList(false)
+                        fetchPersonal(v.id)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+                      <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
+                      <span>{v.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedVol && <p className="text-xs text-green-600 mt-1">✓ 已選擇：{personalSearch}</p>}
             </div>
+
             {selectedVol && (
               <>
-                {/* 統計：手機三欄小字，桌機正常 */}
                 <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4">
                   {[['已出席課程', completedCount, '門'], ['累計學習時數', totalHours, '小時'], ['尚未出席', personalData.length - completedCount, '門']].map(([label, val, unit]) => (
                     <div key={label} className="card text-center p-3 md:p-4">
@@ -266,7 +326,6 @@ export default function Courses() {
                     </div>
                   ))}
                 </div>
-                {/* 課程列表：手機單欄，桌機雙欄 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {personalData.map(c => (
                     <div key={c.id} className={`card border-l-4 ${c.attended ? '' : 'opacity-50'}`}
