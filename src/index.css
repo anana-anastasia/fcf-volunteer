@@ -10,7 +10,7 @@
   /* 手機字體放大 */
   @media (max-width: 768px) {
     html {
-      font-size: 18px;
+      font-size: 22px;
     }
     .table-th {
       font-size: 13px !important;

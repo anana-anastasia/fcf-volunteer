@@ -176,12 +176,12 @@ export default function HairLog() {
               </button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full" style={{ minWidth: '480px' }}>
+              <table className="w-full" style={{ minWidth: '580px' }}>
                 <thead>
                   <tr>
-                    {['日期', '志工', '拆信', '建檔', '感謝卡', '郵寄', '捐髮', '專線', '備註', ''].map(h => (
-                      <th key={h} className="table-th">{h}</th>
-                    ))}
+                    {['日期', '志工', '列印編號', '拆信', '建檔', '感謝卡', '郵寄', '捐髮', '專線', '備註', ''].map(h => (
+                    <th key={h} className="table-th">{h}</th>
+                   ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -191,6 +191,7 @@ export default function HairLog() {
                     <tr key={l.id}>
                       <td className="table-td text-gray-500 whitespace-nowrap">{l.date}</td>
                       <td className="table-td font-medium whitespace-nowrap">{l.volunteer_name}</td>
+                      <td className="table-td font-medium text-blue-600 whitespace-nowrap">{l.print_range || '—'}</td>
                       <td className="table-td">{l.letters || 0}</td>
                       <td className="table-td">{l.excel_count || 0}</td>
                       <td className="table-td">{l.thank_cards || 0}</td>

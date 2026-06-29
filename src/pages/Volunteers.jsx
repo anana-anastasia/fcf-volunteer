@@ -1,7 +1,7 @@
 import { exportVolunteers } from '../lib/excel'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Plus, Trash2, Download, Search, X } from 'lucide-react'
+import { Plus, Trash2, Download, Search, X, Pencil } from 'lucide-react'
 
 const GROUP_BADGE = {
   行政: 'badge-purple',
@@ -16,7 +16,10 @@ export default function Volunteers() {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', group_name: '', phone: '', note: '' })
+  const [showEdit, setShowEdit] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
+  const [form, setForm] = useState({ name: '', group_name: '', phone: '', note: '', volunteer_no: '' })
+  const [editForm, setEditForm] = useState({ name: '', group_name: '', phone: '', note: '', volunteer_no: '' })
   const [submitting, setSubmitting] = useState(false)
   const [adminUnlocked, setAdminUnlocked] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
@@ -35,16 +38,58 @@ export default function Volunteers() {
     if (data) setVolunteers(data)
   }
 
+  async function getNextVolNo() {
+    const { data } = await supabase.from('volunteers').select('volunteer_no')
+    const nums = (data || [])
+      .map(v => parseInt((v.volunteer_no || '').replace(/\D/g, '')))
+      .filter(n => !isNaN(n))
+    const max = nums.length > 0 ? Math.max(...nums) : 0
+    return 'V' + String(max + 1).padStart(3, '0')
+  }
+
   async function handleAdd() {
     if (!form.name.trim() || !form.group_name) return alert('請填寫姓名與組別')
     setSubmitting(true)
     const { error } = await supabase.from('volunteers').insert({
-      name: form.name.trim(), group_name: form.group_name,
-      phone: form.phone || null, note: form.note || null
+      name: form.name.trim(),
+      group_name: form.group_name,
+      phone: form.phone || null,
+      note: form.note || null,
+      volunteer_no: form.volunteer_no || null,
     })
     if (error) { alert('新增失敗'); setSubmitting(false); return }
-    setForm({ name: '', group_name: '', phone: '', note: '' })
+    setForm({ name: '', group_name: '', phone: '', note: '', volunteer_no: '' })
     setShowAdd(false)
+    setSubmitting(false)
+    fetchVols()
+  }
+
+  function openEdit(v) {
+    if (!adminUnlocked) { setShowAdminModal(true); return }
+    setEditTarget(v)
+    setEditForm({
+      name: v.name,
+      group_name: v.group_name,
+      phone: v.phone || '',
+      note: v.note || '',
+      volunteer_no: v.volunteer_no || ''
+    })
+    setShowEdit(true)
+  }
+
+  async function handleEdit() {
+    if (!editForm.name.trim() || !editForm.group_name) return alert('請填寫姓名與組別')
+    setSubmitting(true)
+    const { error } = await supabase.from('volunteers').update({
+      name: editForm.name.trim(),
+      group_name: editForm.group_name,
+      phone: editForm.phone || null,
+      note: editForm.note || null,
+      volunteer_no: editForm.volunteer_no || null,
+    }).eq('id', editTarget.id)
+    if (error) { alert('更新失敗'); setSubmitting(false); return }
+    setShowEdit(false)
+    setEditTarget(null)
     setSubmitting(false)
     fetchVols()
   }
@@ -75,7 +120,11 @@ export default function Volunteers() {
 
   const displayed = volunteers
     .filter(v => filter === 'all' || v.group_name === filter)
-    .filter(v => !search || v.name.includes(search) || (v.phone || '').includes(search))
+    .filter(v => !search ||
+      v.name.includes(search) ||
+      (v.phone || '').includes(search) ||
+      (v.volunteer_no || '').includes(search)
+    )
 
   const counts = {
     all: volunteers.length,
@@ -92,14 +141,17 @@ export default function Volunteers() {
           <button onClick={handleExport} className="btn btn-success text-xs">
             <Download className="w-4 h-4" /><span className="hidden sm:inline">匯出 Excel</span>
           </button>
-          <button onClick={() => setShowAdd(true)} className="btn btn-primary text-xs">
+          <button onClick={async () => {
+            const nextNo = await getNextVolNo()
+            setForm(f => ({ ...f, volunteer_no: nextNo }))
+            setShowAdd(true)
+          }} className="btn btn-primary text-xs">
             <Plus className="w-4 h-4" /><span className="hidden sm:inline">新增志工</span>
           </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
-        {/* 統計卡片：手機2欄，桌機4欄 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {[
             { label: '全體', key: 'all', color: 'border-t-blue-400' },
@@ -120,16 +172,23 @@ export default function Volunteers() {
           <div className="flex items-center gap-3 mb-4 flex-wrap">
             <div className="relative flex-1 min-w-0">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input className="input pl-8 text-xs w-full" placeholder="搜尋姓名或電話..."
+              <input className="input pl-8 text-xs w-full" placeholder="搜尋姓名、編號或電話..."
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <span className="text-xs text-gray-400 shrink-0">共 {displayed.length} 人</span>
             {adminUnlocked && <span className="badge badge-red">管理員模式</span>}
+            <button onClick={() => {
+              if (adminUnlocked) setAdminUnlocked(false)
+              else setShowAdminModal(true)
+            }} className={`btn text-xs ${adminUnlocked ? 'btn-danger' : 'btn-secondary'}`}>
+              {adminUnlocked ? '登出管理員' : '🔒 管理員'}
+            </button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full" style={{ minWidth: '360px' }}>
+            <table className="w-full" style={{ minWidth: '400px' }}>
               <thead>
                 <tr>
+                  <th className="table-th">編號</th>
                   <th className="table-th">姓名</th>
                   <th className="table-th">組別</th>
                   <th className="table-th hidden sm:table-cell">電話</th>
@@ -139,9 +198,12 @@ export default function Volunteers() {
               </thead>
               <tbody>
                 {displayed.length === 0 ? (
-                  <tr><td colSpan={5} className="table-td text-center text-gray-400 py-8">尚無志工資料</td></tr>
+                  <tr><td colSpan={6} className="table-td text-center text-gray-400 py-8">尚無志工資料</td></tr>
                 ) : displayed.map(v => (
                   <tr key={v.id}>
+                    <td className="table-td text-gray-500 font-mono whitespace-nowrap">
+                      {v.volunteer_no || '—'}
+                    </td>
                     <td className="table-td">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
@@ -156,10 +218,18 @@ export default function Volunteers() {
                     <td className="table-td text-gray-500 hidden sm:table-cell">{v.phone || '—'}</td>
                     <td className="table-td text-gray-400 hidden sm:table-cell">{v.note || '—'}</td>
                     <td className="table-td">
-                      <button onClick={() => askDelete(v.id)}
-                        className="p-1 text-gray-300 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex gap-1">
+                        {adminUnlocked && (
+                          <button onClick={() => openEdit(v)}
+                            className="p-1 text-gray-300 hover:text-blue-500 transition-colors">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button onClick={() => askDelete(v.id)}
+                          className="p-1 text-gray-300 hover:text-red-500 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -179,23 +249,33 @@ export default function Volunteers() {
             </div>
             <div className="space-y-3">
               <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">志工編號</label>
+                <input className="input" placeholder="例如 V001"
+                  value={form.volunteer_no}
+                  onChange={e => setForm(f => ({ ...f, volunteer_no: e.target.value }))} />
+              </div>
+              <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">姓名 *</label>
-                <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                <input className="input" value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">組別 *</label>
-                <select className="input" value={form.group_name} onChange={e => setForm(f => ({ ...f, group_name: e.target.value }))}>
+                <select className="input" value={form.group_name}
+                  onChange={e => setForm(f => ({ ...f, group_name: e.target.value }))}>
                   <option value="">— 請選擇 —</option>
                   {GROUPS.map(g => <option key={g}>{g}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
-                <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+                <input className="input" value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">備註</label>
-                <input className="input" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
+                <input className="input" value={form.note}
+                  onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
               </div>
             </div>
             <div className="flex gap-2 mt-5">
@@ -209,12 +289,61 @@ export default function Volunteers() {
         </div>
       )}
 
+      {/* 編輯志工 Modal */}
+      {showEdit && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm">編輯志工</h3>
+              <button onClick={() => setShowEdit(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">志工編號</label>
+                <input className="input" value={editForm.volunteer_no}
+                  onChange={e => setEditForm(f => ({ ...f, volunteer_no: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">姓名 *</label>
+                <input className="input" value={editForm.name}
+                  onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">組別 *</label>
+                <select className="input" value={editForm.group_name}
+                  onChange={e => setEditForm(f => ({ ...f, group_name: e.target.value }))}>
+                  <option value="">— 請選擇 —</option>
+                  {GROUPS.map(g => <option key={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
+                <input className="input" value={editForm.phone}
+                  onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">備註</label>
+                <input className="input" value={editForm.note}
+                  onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={handleEdit} disabled={submitting}
+                className="btn btn-primary flex-1 justify-center disabled:opacity-60">
+                {submitting ? '儲存中...' : '儲存變更'}
+              </button>
+              <button onClick={() => setShowEdit(false)} className="btn btn-secondary">取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 管理員密碼 Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
             <h3 className="font-semibold text-sm mb-1">管理員驗證</h3>
-            <p className="text-xs text-gray-400 mb-4">請輸入管理員密碼以執行刪除</p>
+            <p className="text-xs text-gray-400 mb-4">請輸入管理員密碼以執行刪除與編輯</p>
             <input type="password" className="input mb-2" placeholder="輸入密碼"
               value={pwInput} onChange={e => setPwInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdminLogin()} />

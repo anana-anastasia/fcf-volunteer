@@ -44,7 +44,7 @@ export default function Schedule({ toast }) {
   useEffect(() => { fetchShifts() }, [fetchShifts])
 
   useEffect(() => {
-    supabase.from('volunteers').select('id, name, group_name').order('name')
+    supabase.from('volunteers').select('id, name, group_name, volunteer_no, phone').order('name')
       .then(({ data }) => { if (data) setVolunteers(data) })
   }, [])
 
@@ -71,13 +71,14 @@ export default function Schedule({ toast }) {
   }
 
   const openAdd = (date) => {
-    setForm({ volunteer_id: volunteers[0]?.id || '', time_start: '09:00', time_end: '12:00' })
+    setForm({ volunteer_id: '', volSearch: '', time_start: '09:00', time_end: '12:00' })
     setModal({ mode: 'add', date: format(date, 'yyyy-MM-dd') })
   }
 
   const openEdit = (shift) => {
     setForm({
       volunteer_id: shift.volunteer_id,
+      volSearch: shift.volunteer_name || '',
       time_start: shift.time_start?.slice(0, 5),
       time_end: shift.time_end?.slice(0, 5)
     })
@@ -222,15 +223,37 @@ export default function Schedule({ toast }) {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">志工</label>
-                <select className="input" value={form.volunteer_id}
-                  onChange={e => setForm(f => ({ ...f, volunteer_id: e.target.value }))}>
-                  <option value="">— 請選擇 —</option>
-                  {volunteers.map(v => (
-                    <option key={v.id} value={v.id}>{v.name}（{v.group_name}）</option>
-                  ))}
-                </select>
-              </div>
+  <label className="text-xs font-medium text-gray-600 block mb-1">志工</label>
+  <input className="input mb-1" placeholder="搜尋姓名、編號或電話..."
+    value={form.volSearch || ''}
+    onChange={e => setForm(f => ({ ...f, volSearch: e.target.value, volunteer_id: '' }))} />
+  {form.volSearch && (
+    <div className="border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+      {volunteers
+        .filter(v =>
+          v.name.includes(form.volSearch) ||
+          (v.volunteer_no || '').includes(form.volSearch) ||
+          (v.volunteer_no || '').replace(/\D/g, '').includes(form.volSearch.replace(/\D/g, '')) ||
+          (v.phone || '').includes(form.volSearch)
+        )
+        .map(v => (
+          <button key={v.id} type="button"
+            onClick={() => setForm(f => ({ ...f, volunteer_id: v.id, volSearch: v.name }))}
+            className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2
+              ${form.volunteer_id === v.id ? 'bg-blue-50 text-blue-600' : ''}`}>
+            <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
+            <span>{v.name}</span>
+            <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
+          </button>
+        ))}
+    </div>
+  )}
+  {form.volunteer_id && !form.volSearch?.includes('搜') && (
+    <p className="text-xs text-green-600 mt-1">
+      ✓ 已選擇：{volunteers.find(v => v.id === form.volunteer_id)?.name}
+    </p>
+  )}
+</div>
               <div className="flex gap-2 items-center">
                 <div className="flex-1">
                   <label className="text-xs font-medium text-gray-600 block mb-1">開始時間</label>
