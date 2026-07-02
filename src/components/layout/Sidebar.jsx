@@ -17,7 +17,10 @@ export default function Sidebar({ onClose }) {
   return (
     <aside className="w-52 bg-white border-r border-gray-100 flex flex-col flex-shrink-0 h-screen">
       <div className="px-4 py-4 border-b border-gray-100 flex items-start justify-between">
-        <img src="/logo.png" alt="台灣癌症基金會" className="h-10 w-auto" />
+        <div>
+          <img src="/logo.png" alt="台灣癌症基金會" className="h-10 w-auto" />
+          <div className="text-sm font-medium text-gray-800 mt-1.5">志工管理系統</div>
+        </div>
         {/* 手機關閉按鈕 */}
         {onClose && (
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 md:hidden">

@@ -40,6 +40,7 @@ export default function Layout() {
             </svg>
           </button>
           <img src="/logo.png" alt="台灣癌症基金會" className="h-7 w-auto" />
+          <span className="text-sm font-medium text-gray-800">志工管理系統</span>
         </div>
 
         <Outlet />

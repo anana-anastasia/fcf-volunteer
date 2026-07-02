@@ -81,7 +81,7 @@ export default function Records() {
   const filteredVols = volunteers.filter(v =>
     v.name.includes(volSearch) ||
     (v.volunteer_no || '').includes(volSearch) ||
-    (v.volunteer_no || '').replace(/\D/g, '').includes(volSearch.replace(/\D/g, '')) ||
+    (volSearch.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(volSearch.replace(/\D/g, ''))) ||
     (v.phone || '').includes(volSearch)
   )
 

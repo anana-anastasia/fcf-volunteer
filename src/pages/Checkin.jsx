@@ -25,6 +25,8 @@ export default function Checkin() {
   const [allVolunteers, setAllVolunteers] = useState([])
   const [showManualList, setShowManualList] = useState(false)
   const [manualVolId, setManualVolId] = useState('')
+  const [backfillForm, setBackfillForm] = useState({ volunteer_id: '', volSearch: '', date: today, time_in: '', time_out: '' })
+  const [showBackfillList, setShowBackfillList] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -89,6 +91,25 @@ export default function Checkin() {
     setManualVolId('')
     setShowManualList(false)
     fetchData()
+  }
+
+  async function handleBackfillCheckin() {
+    if (!backfillForm.volunteer_id) return alert('請先選擇志工')
+    if (!backfillForm.date || !backfillForm.time_in) return alert('請填寫日期與簽到時間')
+    const checked_in_at = new Date(`${backfillForm.date}T${backfillForm.time_in}:00`).toISOString()
+    const checked_out_at = backfillForm.time_out
+      ? new Date(`${backfillForm.date}T${backfillForm.time_out}:00`).toISOString()
+      : null
+    const { error } = await supabase.from('checkins').insert({
+      volunteer_id: backfillForm.volunteer_id,
+      checked_in_at,
+      checked_out_at
+    })
+    if (error) return alert('補簽到失敗')
+    setBackfillForm({ volunteer_id: '', volSearch: '', date: today, time_in: '', time_out: '' })
+    setShowBackfillList(false)
+    fetchData()
+    alert(backfillForm.date === today ? '補簽到成功' : '補簽到成功，可至「服務紀錄」查看')
   }
 
   function askDelete(id) {
@@ -206,7 +227,7 @@ export default function Checkin() {
                       .filter(v =>
                         v.name.includes(manualName) ||
                         (v.volunteer_no || '').includes(manualName) ||
-                        (v.volunteer_no || '').replace(/\D/g, '').includes(manualName.replace(/\D/g, '')) ||
+                        (manualName.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(manualName.replace(/\D/g, ''))) ||
                         (v.phone || '').includes(manualName)
                       )
                       .map(v => (
@@ -229,6 +250,75 @@ export default function Checkin() {
                 <p className="text-xs text-green-600 mb-2">✓ 已選擇：{manualName}</p>
               )}
               <button onClick={handleManualCheckin} className="btn btn-primary w-full justify-center">簽到</button>
+            </div>
+
+            {/* 管理員補簽到 */}
+            <div className="card">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium text-sm text-gray-700">管理員補簽到</span>
+                {!adminUnlocked && <span className="badge badge-gray text-xs">需管理員權限</span>}
+              </div>
+              {!adminUnlocked ? (
+                <button onClick={() => setShowAdminModal(true)}
+                  className="btn btn-secondary w-full justify-center text-xs">
+                  🔒 解鎖以使用補簽到
+                </button>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="relative">
+                    <input className="input" placeholder="搜尋姓名、編號或電話..."
+                      value={backfillForm.volSearch}
+                      onChange={e => {
+                        setBackfillForm(f => ({ ...f, volSearch: e.target.value, volunteer_id: '' }))
+                        setShowBackfillList(true)
+                      }} />
+                    {backfillForm.volSearch && showBackfillList && (
+                      <div className="absolute z-10 w-full mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
+                        {allVolunteers
+                          .filter(v =>
+                            v.name.includes(backfillForm.volSearch) ||
+                            (v.volunteer_no || '').includes(backfillForm.volSearch) ||
+                            (backfillForm.volSearch.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(backfillForm.volSearch.replace(/\D/g, ''))) ||
+                            (v.phone || '').includes(backfillForm.volSearch)
+                          )
+                          .map(v => (
+                            <button key={v.id} type="button"
+                              onClick={() => {
+                                setBackfillForm(f => ({ ...f, volunteer_id: v.id, volSearch: v.name }))
+                                setShowBackfillList(false)
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+                              <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
+                              <span>{v.name}</span>
+                              <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                    {backfillForm.volunteer_id && (
+                      <p className="text-xs text-green-600 mt-1">✓ 已選擇：{backfillForm.volSearch}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">日期</label>
+                      <input type="date" className="input" value={backfillForm.date}
+                        onChange={e => setBackfillForm(f => ({ ...f, date: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">簽到時間</label>
+                      <input type="time" className="input" value={backfillForm.time_in}
+                        onChange={e => setBackfillForm(f => ({ ...f, time_in: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">簽退時間<span className="text-gray-400">(選填)</span></label>
+                      <input type="time" className="input" value={backfillForm.time_out}
+                        onChange={e => setBackfillForm(f => ({ ...f, time_out: e.target.value }))} />
+                    </div>
+                  </div>
+                  <button onClick={handleBackfillCheckin} className="btn btn-primary w-full justify-center">送出補簽到</button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -293,7 +383,7 @@ export default function Checkin() {
               <button onClick={() => { setShowAdminModal(false); setPwInput(''); setPwError('') }}
                 className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
             </div>
-            <p className="text-xs text-gray-400 mb-4">輸入管理員密碼以啟用刪除功能</p>
+            <p className="text-xs text-gray-400 mb-4">輸入管理員密碼以啟用補簽到與刪除功能</p>
             <input type="password" className="input mb-2" placeholder="輸入密碼"
               value={pwInput} onChange={e => setPwInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdminLogin()} autoFocus />

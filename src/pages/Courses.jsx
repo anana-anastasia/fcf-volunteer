@@ -114,7 +114,7 @@ export default function Courses() {
   const filterVols = (keyword) => volunteers.filter(v =>
     v.name.includes(keyword) ||
     (v.volunteer_no || '').includes(keyword) ||
-    (v.volunteer_no || '').replace(/\D/g, '').includes(keyword.replace(/\D/g, '')) ||
+    (keyword.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(keyword.replace(/\D/g, ''))) ||
     (v.phone || '').includes(keyword)
   )
 

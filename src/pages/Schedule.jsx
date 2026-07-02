@@ -233,7 +233,7 @@ export default function Schedule({ toast }) {
         .filter(v =>
           v.name.includes(form.volSearch) ||
           (v.volunteer_no || '').includes(form.volSearch) ||
-          (v.volunteer_no || '').replace(/\D/g, '').includes(form.volSearch.replace(/\D/g, '')) ||
+          (form.volSearch.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(form.volSearch.replace(/\D/g, ''))) ||
           (v.phone || '').includes(form.volSearch)
         )
         .map(v => (
