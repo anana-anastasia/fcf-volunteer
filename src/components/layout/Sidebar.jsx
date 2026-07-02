@@ -1,14 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Calendar, QrCode, NotebookText,
-  GraduationCap, FileText, Users, Heart, X
+  LayoutDashboard, Calendar, QrCode,
+  GraduationCap, FileText, Users, X
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: '總覽', icon: LayoutDashboard, end: true },
   { to: '/schedule', label: '排班管理', icon: Calendar },
   { to: '/checkin', label: '簽到系統', icon: QrCode },
-  { to: '/hairlog', label: '每日工作日誌', icon: NotebookText },
   { to: '/courses', label: '在職教育', icon: GraduationCap },
   { to: '/records', label: '服務紀錄', icon: FileText },
   { to: '/volunteers', label: '志工資料管理', icon: Users },
@@ -18,13 +17,7 @@ export default function Sidebar({ onClose }) {
   return (
     <aside className="w-52 bg-white border-r border-gray-100 flex flex-col flex-shrink-0 h-screen">
       <div className="px-4 py-4 border-b border-gray-100 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <Heart className="w-4 h-4 text-red-500" />
-            <span className="text-xs font-semibold text-gray-500 tracking-wide">台灣癌症基金會</span>
-          </div>
-          <div className="text-sm font-medium text-gray-800">志工管理系統</div>
-        </div>
+        <img src="/logo.png" alt="台灣癌症基金會" className="h-10 w-auto" />
         {/* 手機關閉按鈕 */}
         {onClose && (
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 md:hidden">

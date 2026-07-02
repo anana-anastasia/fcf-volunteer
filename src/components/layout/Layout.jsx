@@ -39,7 +39,7 @@ export default function Layout() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="text-sm font-medium text-gray-800">志工管理系統</span>
+          <img src="/logo.png" alt="台灣癌症基金會" className="h-7 w-auto" />
         </div>
 
         <Outlet />
