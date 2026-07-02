@@ -93,6 +93,14 @@ export default function Checkin() {
     fetchData()
   }
 
+const handleManualCheckout = async (checkinId) => {
+  const { error } = await supabase.from('checkins')
+    .update({ checked_out_at: new Date().toISOString() })
+    .eq('id', checkinId)
+  if (error) return alert('簽退失敗')
+  fetchData()
+}
+
   async function handleBackfillCheckin() {
     if (!backfillForm.volunteer_id) return alert('請先選擇志工')
     if (!backfillForm.date || !backfillForm.time_in) return alert('請填寫日期與簽到時間')
@@ -356,9 +364,14 @@ export default function Checkin() {
                     <span className={`badge ${GROUP_BADGE[c.group_name] || 'badge-gray'} text-[10px] hidden sm:inline-flex`}>
                       {c.group_name}
                     </span>
-                    <span className={`badge ${c.checked_out_at ? 'badge-gray' : 'badge-green'} text-[10px] flex-shrink-0`}>
-                      {c.checked_out_at ? '已簽退' : '服務中'}
-                    </span>
+                    {c.checked_out_at ? (
+                      <span className="badge badge-gray text-[10px]">已簽退</span>
+                    ) : (
+                      <button onClick={() => handleManualCheckout(c.id)}
+                        className="badge badge-green text-[10px] cursor-pointer hover:bg-red-50 hover:text-red-600 transition-colors">
+                        服務中 → 簽退
+                    </button>
+                    )}
                     {adminUnlocked && (
                       <button onClick={() => askDelete(c.id)}
                         className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">

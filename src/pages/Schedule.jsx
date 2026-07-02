@@ -255,18 +255,30 @@ export default function Schedule({ toast }) {
   )}
 </div>
               <div className="flex gap-2 items-center">
-                <div className="flex-1">
-                  <label className="text-xs font-medium text-gray-600 block mb-1">開始時間</label>
-                  <input type="time" className="input" value={form.time_start}
-                    onChange={e => setForm(f => ({ ...f, time_start: e.target.value }))} />
-                </div>
-                <span className="text-gray-400 mt-5">–</span>
-                <div className="flex-1">
-                  <label className="text-xs font-medium text-gray-600 block mb-1">結束時間</label>
-                  <input type="time" className="input" value={form.time_end}
-                    onChange={e => setForm(f => ({ ...f, time_end: e.target.value }))} />
-                </div>
-              </div>
+  <div className="flex-1">
+    <label className="text-xs font-medium text-gray-600 block mb-1">開始時間</label>
+    <select className="input" value={form.time_start}
+      onChange={e => setForm(f => ({ ...f, time_start: e.target.value }))}>
+      {Array.from({ length: 48 }, (_, i) => {
+        const h = String(Math.floor(i / 2)).padStart(2, '0')
+        const m = i % 2 === 0 ? '00' : '30'
+        return <option key={i} value={`${h}:${m}`}>{`${h}:${m}`}</option>
+      })}
+    </select>
+  </div>
+  <span className="text-gray-400 mt-5">–</span>
+  <div className="flex-1">
+    <label className="text-xs font-medium text-gray-600 block mb-1">結束時間</label>
+    <select className="input" value={form.time_end}
+      onChange={e => setForm(f => ({ ...f, time_end: e.target.value }))}>
+      {Array.from({ length: 48 }, (_, i) => {
+        const h = String(Math.floor(i / 2)).padStart(2, '0')
+        const m = i % 2 === 0 ? '00' : '30'
+        return <option key={i} value={`${h}:${m}`}>{`${h}:${m}`}</option>
+      })}
+    </select>
+  </div>
+</div>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={handleSave} className="btn btn-primary flex-1 justify-center">
