@@ -3,39 +3,44 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Plus, Trash2, Download, Search, X, Pencil } from 'lucide-react'
 
-const GROUP_BADGE = {
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD
+
+const GROUP_COLORS = {
   行政: 'badge-purple',
   捐髮: 'badge-amber',
-  關懷: 'badge-teal'
+  關懷: 'badge-teal',
+  機動: 'badge-blue',
 }
-const GROUPS = ['行政', '捐髮', '關懷']
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD
 
 export default function Volunteers() {
   const [volunteers, setVolunteers] = useState([])
+  const [groups, setGroups] = useState([])
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
-  const [form, setForm] = useState({ name: '', group_name: '', phone: '', note: '', volunteer_no: '' })
-  const [editForm, setEditForm] = useState({ name: '', group_name: '', phone: '', note: '', volunteer_no: '' })
+  const [form, setForm] = useState({ name: '', volunteer_no: '', group_names: [], phone: '', note: '' })
+  const [editForm, setEditForm] = useState({ name: '', volunteer_no: '', group_names: [], phone: '', note: '' })
   const [submitting, setSubmitting] = useState(false)
   const [adminUnlocked, setAdminUnlocked] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState('')
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [showAddGroup, setShowAddGroup] = useState(false)
 
-  useEffect(() => { fetchVols() }, [])
-
-  async function handleExport() {
-    await exportVolunteers(volunteers)
-  }
+  useEffect(() => { fetchVols(); fetchGroups() }, [])
 
   async function fetchVols() {
-    const { data } = await supabase.from('volunteers').select('*').order('group_name').order('name')
+    const { data } = await supabase.from('volunteers').select('*').order('name')
     if (data) setVolunteers(data)
+  }
+
+  async function fetchGroups() {
+    const { data } = await supabase.from('groups').select('*').order('name')
+    if (data) setGroups(data)
   }
 
   async function getNextVolNo() {
@@ -48,17 +53,18 @@ export default function Volunteers() {
   }
 
   async function handleAdd() {
-    if (!form.name.trim() || !form.group_name) return alert('請填寫姓名與組別')
+    if (!form.name.trim() || form.group_names.length === 0) return alert('請填寫姓名並選擇至少一個組別')
     setSubmitting(true)
     const { error } = await supabase.from('volunteers').insert({
       name: form.name.trim(),
-      group_name: form.group_name,
+      volunteer_no: form.volunteer_no || null,
+      group_name: form.group_names[0],
+      group_names: form.group_names,
       phone: form.phone || null,
       note: form.note || null,
-      volunteer_no: form.volunteer_no || null,
     })
     if (error) { alert('新增失敗'); setSubmitting(false); return }
-    setForm({ name: '', group_name: '', phone: '', note: '', volunteer_no: '' })
+    setForm({ name: '', volunteer_no: '', group_names: [], phone: '', note: '' })
     setShowAdd(false)
     setSubmitting(false)
     fetchVols()
@@ -69,29 +75,62 @@ export default function Volunteers() {
     setEditTarget(v)
     setEditForm({
       name: v.name,
-      group_name: v.group_name,
+      volunteer_no: v.volunteer_no || '',
+      group_names: v.group_names?.length ? v.group_names : [v.group_name].filter(Boolean),
       phone: v.phone || '',
       note: v.note || '',
-      volunteer_no: v.volunteer_no || ''
     })
     setShowEdit(true)
   }
 
   async function handleEdit() {
-    if (!editForm.name.trim() || !editForm.group_name) return alert('請填寫姓名與組別')
+    if (!editForm.name.trim() || editForm.group_names.length === 0) return alert('請填寫姓名並選擇至少一個組別')
     setSubmitting(true)
     const { error } = await supabase.from('volunteers').update({
       name: editForm.name.trim(),
-      group_name: editForm.group_name,
+      volunteer_no: editForm.volunteer_no || null,
+      group_name: editForm.group_names[0],
+      group_names: editForm.group_names,
       phone: editForm.phone || null,
       note: editForm.note || null,
-      volunteer_no: editForm.volunteer_no || null,
     }).eq('id', editTarget.id)
     if (error) { alert('更新失敗'); setSubmitting(false); return }
     setShowEdit(false)
     setEditTarget(null)
     setSubmitting(false)
     fetchVols()
+  }
+
+  function toggleGroup(groupName, isEdit = false) {
+    if (isEdit) {
+      setEditForm(f => ({
+        ...f,
+        group_names: f.group_names.includes(groupName)
+          ? f.group_names.filter(g => g !== groupName)
+          : [...f.group_names, groupName]
+      }))
+    } else {
+      setForm(f => ({
+        ...f,
+        group_names: f.group_names.includes(groupName)
+          ? f.group_names.filter(g => g !== groupName)
+          : [...f.group_names, groupName]
+      }))
+    }
+  }
+
+  async function handleAddGroup() {
+    if (!newGroupName.trim()) return
+    const { error } = await supabase.from('groups').insert({ name: newGroupName.trim() })
+    if (error) return alert('新增失敗，組別名稱可能已存在')
+    setNewGroupName('')
+    fetchGroups()
+  }
+
+  async function handleDeleteGroup(id, name) {
+    if (!confirm(`確定刪除「${name}」組別？`)) return
+    await supabase.from('groups').delete().eq('id', id)
+    fetchGroups()
   }
 
   function askDelete(id) {
@@ -118,20 +157,22 @@ export default function Volunteers() {
     }
   }
 
+  async function handleExport() {
+    await exportVolunteers(volunteers)
+  }
+
   const displayed = volunteers
-    .filter(v => filter === 'all' || v.group_name === filter)
+    .filter(v => {
+      if (filter === 'all') return true
+      const gnames = v.group_names?.length ? v.group_names : [v.group_name]
+      return gnames.includes(filter)
+    })
     .filter(v => !search ||
       v.name.includes(search) ||
       (v.phone || '').includes(search) ||
-      (v.volunteer_no || '').includes(search)
+      (v.volunteer_no || '').includes(search) ||
+      (v.volunteer_no || '').replace(/\D/g, '').includes(search.replace(/\D/g, ''))
     )
-
-  const counts = {
-    all: volunteers.length,
-    行政: volunteers.filter(v => v.group_name === '行政').length,
-    捐髮: volunteers.filter(v => v.group_name === '捐髮').length,
-    關懷: volunteers.filter(v => v.group_name === '關懷').length,
-  }
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -152,20 +193,35 @@ export default function Volunteers() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          {[
-            { label: '全體', key: 'all', color: 'border-t-blue-400' },
-            { label: '行政組', key: '行政', color: 'border-t-purple-400' },
-            { label: '捐髮組', key: '捐髮', color: 'border-t-amber-400' },
-            { label: '關懷組', key: '關懷', color: 'border-t-teal-400' },
-          ].map(({ label, key, color }) => (
-            <button key={key} onClick={() => setFilter(key)}
-              className={`card border-t-2 ${color} text-left transition-all hover:shadow-md ${filter === key ? 'shadow-md' : ''}`}>
-              <div className="text-xs text-gray-400">{label}</div>
-              <div className="text-2xl font-semibold text-gray-800 mt-0.5">{counts[key]}</div>
-              <div className="text-xs text-gray-400">人</div>
+        {/* 組別篩選卡片 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5 overflow-x-auto">
+          <button onClick={() => setFilter('all')}
+            className={`card border-t-2 border-t-blue-400 text-left transition-all hover:shadow-md ${filter === 'all' ? 'shadow-md' : ''}`}>
+            <div className="text-xs text-gray-400">全體</div>
+            <div className="text-2xl font-semibold text-gray-800 mt-0.5">{volunteers.length}</div>
+            <div className="text-xs text-gray-400">人</div>
+          </button>
+          {groups.map(g => {
+            const count = volunteers.filter(v => {
+              const gnames = v.group_names?.length ? v.group_names : [v.group_name]
+              return gnames.includes(g.name)
+            }).length
+            return (
+              <button key={g.id} onClick={() => setFilter(g.name)}
+                className={`card border-t-2 border-t-gray-300 text-left transition-all hover:shadow-md ${filter === g.name ? 'shadow-md' : ''}`}>
+                <div className="text-xs text-gray-400">{g.name}組</div>
+                <div className="text-2xl font-semibold text-gray-800 mt-0.5">{count}</div>
+                <div className="text-xs text-gray-400">人</div>
+              </button>
+            )
+          })}
+          {adminUnlocked && (
+            <button onClick={() => setShowAddGroup(true)}
+              className="card border-t-2 border-dashed border-gray-200 text-left hover:shadow-md flex flex-col items-center justify-center py-4">
+              <Plus className="w-5 h-5 text-gray-400" />
+              <div className="text-xs text-gray-400 mt-1">管理組別</div>
             </button>
-          ))}
+          )}
         </div>
 
         <div className="card">
@@ -199,40 +255,47 @@ export default function Volunteers() {
               <tbody>
                 {displayed.length === 0 ? (
                   <tr><td colSpan={6} className="table-td text-center text-gray-400 py-8">尚無志工資料</td></tr>
-                ) : displayed.map(v => (
-                  <tr key={v.id}>
-                    <td className="table-td text-gray-500 font-mono whitespace-nowrap">
-                      {v.volunteer_no || '—'}
-                    </td>
-                    <td className="table-td">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
-                          {v.name[0]}
+                ) : displayed.map(v => {
+                  const gnames = v.group_names?.length ? v.group_names : [v.group_name].filter(Boolean)
+                  return (
+                    <tr key={v.id}>
+                      <td className="table-td text-gray-500 font-mono whitespace-nowrap">
+                        {v.volunteer_no || '—'}
+                      </td>
+                      <td className="table-td">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
+                            {v.name[0]}
+                          </div>
+                          <span className="font-medium">{v.name}</span>
                         </div>
-                        <span className="font-medium">{v.name}</span>
-                      </div>
-                    </td>
-                    <td className="table-td">
-                      <span className={`badge ${GROUP_BADGE[v.group_name] || 'badge-gray'}`}>{v.group_name}</span>
-                    </td>
-                    <td className="table-td text-gray-500 hidden sm:table-cell">{v.phone || '—'}</td>
-                    <td className="table-td text-gray-400 hidden sm:table-cell">{v.note || '—'}</td>
-                    <td className="table-td">
-                      <div className="flex gap-1">
-                        {adminUnlocked && (
-                          <button onClick={() => openEdit(v)}
-                            className="p-1 text-gray-300 hover:text-blue-500 transition-colors">
-                            <Pencil className="w-3.5 h-3.5" />
+                      </td>
+                      <td className="table-td">
+                        <div className="flex gap-1 flex-wrap">
+                          {gnames.map(g => (
+                            <span key={g} className={`badge ${GROUP_COLORS[g] || 'badge-gray'}`}>{g}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="table-td text-gray-500 hidden sm:table-cell">{v.phone || '—'}</td>
+                      <td className="table-td text-gray-400 hidden sm:table-cell">{v.note || '—'}</td>
+                      <td className="table-td">
+                        <div className="flex gap-1">
+                          {adminUnlocked && (
+                            <button onClick={() => openEdit(v)}
+                              className="p-1 text-gray-300 hover:text-blue-500 transition-colors">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button onClick={() => askDelete(v.id)}
+                            className="p-1 text-gray-300 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        )}
-                        <button onClick={() => askDelete(v.id)}
-                          className="p-1 text-gray-300 hover:text-red-500 transition-colors">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -260,12 +323,20 @@ export default function Volunteers() {
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">組別 *</label>
-                <select className="input" value={form.group_name}
-                  onChange={e => setForm(f => ({ ...f, group_name: e.target.value }))}>
-                  <option value="">— 請選擇 —</option>
-                  {GROUPS.map(g => <option key={g}>{g}</option>)}
-                </select>
+                <label className="text-xs font-medium text-gray-600 block mb-1">組別 * （可多選）</label>
+                <div className="flex flex-wrap gap-2">
+                  {groups.map(g => (
+                    <button key={g.id} type="button"
+                      onClick={() => toggleGroup(g.name)}
+                      className={`px-3 py-1 rounded-full text-xs border transition-all ${
+                        form.group_names.includes(g.name)
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                      }`}>
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
@@ -309,12 +380,20 @@ export default function Volunteers() {
                   onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">組別 *</label>
-                <select className="input" value={editForm.group_name}
-                  onChange={e => setEditForm(f => ({ ...f, group_name: e.target.value }))}>
-                  <option value="">— 請選擇 —</option>
-                  {GROUPS.map(g => <option key={g}>{g}</option>)}
-                </select>
+                <label className="text-xs font-medium text-gray-600 block mb-1">組別 * （可多選）</label>
+                <div className="flex flex-wrap gap-2">
+                  {groups.map(g => (
+                    <button key={g.id} type="button"
+                      onClick={() => toggleGroup(g.name, true)}
+                      className={`px-3 py-1 rounded-full text-xs border transition-all ${
+                        editForm.group_names.includes(g.name)
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                      }`}>
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
@@ -338,11 +417,54 @@ export default function Volunteers() {
         </div>
       )}
 
-      {/* 管理員密碼 Modal */}
+      {/* 管理組別 Modal */}
+      {showAddGroup && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm">管理組別</h3>
+              <button onClick={() => setShowAddGroup(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">新增組別</label>
+                <div className="flex gap-2">
+                  <input className="input flex-1" value={newGroupName}
+                    onChange={e => setNewGroupName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddGroup()}
+                    placeholder="輸入組別名稱" />
+                  <button onClick={handleAddGroup} className="btn btn-primary">新增</button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-2">現有組別</label>
+                <div className="space-y-1">
+                  {groups.map(g => (
+                    <div key={g.id} className="flex items-center justify-between py-1.5 border-b border-gray-50">
+                      <span className="text-sm">{g.name}</span>
+                      <button onClick={() => handleDeleteGroup(g.id, g.name)}
+                        className="p-1 text-gray-300 hover:text-red-500">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button onClick={() => setShowAddGroup(false)} className="btn btn-secondary w-full justify-center mt-4">關閉</button>
+          </div>
+        </div>
+      )}
+
+      {/* 管理員 Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
-            <h3 className="font-semibold text-sm mb-1">管理員驗證</h3>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-semibold text-sm">管理員驗證</h3>
+              <button onClick={() => { setShowAdminModal(false); setPwInput(''); setPwError('') }}
+                className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
+            </div>
             <p className="text-xs text-gray-400 mb-4">請輸入管理員密碼以執行刪除與編輯</p>
             <input type="password" className="input mb-2" placeholder="輸入密碼"
               value={pwInput} onChange={e => setPwInput(e.target.value)}
