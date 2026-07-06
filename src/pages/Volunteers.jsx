@@ -58,7 +58,7 @@ export default function Volunteers() {
     const { error } = await supabase.from('volunteers').insert({
       name: form.name.trim(),
       volunteer_no: form.volunteer_no || null,
-      group_name: form.group_names[0],
+      group_name: null,
       group_names: form.group_names,
       phone: form.phone || null,
       note: form.note || null,
@@ -89,7 +89,7 @@ export default function Volunteers() {
     const { error } = await supabase.from('volunteers').update({
       name: editForm.name.trim(),
       volunteer_no: editForm.volunteer_no || null,
-      group_name: editForm.group_names[0],
+      group_name: editForm. null,
       group_names: editForm.group_names,
       phone: editForm.phone || null,
       note: editForm.note || null,
