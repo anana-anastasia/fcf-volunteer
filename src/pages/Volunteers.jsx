@@ -12,16 +12,24 @@ const GROUP_COLORS = {
   機動: 'badge-blue',
 }
 
+const IDENTITIES = ['癌友', '家屬', '一般民眾', '抗癌鬥士']
+
+const emptyForm = {
+  name: '', volunteer_no: '', group_names: [],
+  identities: [], skill_names: [], phone: '', note: ''
+}
+
 export default function Volunteers() {
   const [volunteers, setVolunteers] = useState([])
   const [groups, setGroups] = useState([])
+  const [skills, setSkills] = useState([])
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
-  const [form, setForm] = useState({ name: '', volunteer_no: '', group_names: [], phone: '', note: '' })
-  const [editForm, setEditForm] = useState({ name: '', volunteer_no: '', group_names: [], phone: '', note: '' })
+  const [form, setForm] = useState(emptyForm)
+  const [editForm, setEditForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [adminUnlocked, setAdminUnlocked] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
@@ -29,18 +37,31 @@ export default function Volunteers() {
   const [pwError, setPwError] = useState('')
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [newGroupName, setNewGroupName] = useState('')
+  const [newSkillName, setNewSkillName] = useState('')
   const [showAddGroup, setShowAddGroup] = useState(false)
 
-  useEffect(() => { fetchVols(); fetchGroups() }, [])
+  useEffect(() => { fetchVols(); fetchGroups(); fetchSkills() }, [])
 
   async function fetchVols() {
-    const { data } = await supabase.from('volunteers').select('*').order('name')
-    if (data) setVolunteers(data)
+    const { data } = await supabase.from('volunteers').select('*')
+    if (data) {
+      const sorted = data.sort((a, b) => {
+        const na = parseInt((a.volunteer_no || '').replace(/\D/g, '')) || 99999
+        const nb = parseInt((b.volunteer_no || '').replace(/\D/g, '')) || 99999
+        return na - nb
+      })
+      setVolunteers(sorted)
+    }
   }
 
   async function fetchGroups() {
     const { data } = await supabase.from('groups').select('*').order('name')
     if (data) setGroups(data)
+  }
+
+  async function fetchSkills() {
+    const { data } = await supabase.from('skills').select('*').order('name')
+    if (data) setSkills(data)
   }
 
   async function getNextVolNo() {
@@ -60,11 +81,13 @@ export default function Volunteers() {
       volunteer_no: form.volunteer_no || null,
       group_name: null,
       group_names: form.group_names,
+      identities: form.identities,
+      skill_names: form.skill_names,
       phone: form.phone || null,
       note: form.note || null,
     })
     if (error) { alert('新增失敗'); setSubmitting(false); return }
-    setForm({ name: '', volunteer_no: '', group_names: [], phone: '', note: '' })
+    setForm(emptyForm)
     setShowAdd(false)
     setSubmitting(false)
     fetchVols()
@@ -77,6 +100,8 @@ export default function Volunteers() {
       name: v.name,
       volunteer_no: v.volunteer_no || '',
       group_names: v.group_names?.length ? v.group_names : [v.group_name].filter(Boolean),
+      identities: v.identities || [],
+      skill_names: v.skill_names || [],
       phone: v.phone || '',
       note: v.note || '',
     })
@@ -89,8 +114,10 @@ export default function Volunteers() {
     const { error } = await supabase.from('volunteers').update({
       name: editForm.name.trim(),
       volunteer_no: editForm.volunteer_no || null,
-      group_name: editForm. null,
+      group_name: null,
       group_names: editForm.group_names,
+      identities: editForm.identities,
+      skill_names: editForm.skill_names,
       phone: editForm.phone || null,
       note: editForm.note || null,
     }).eq('id', editTarget.id)
@@ -101,20 +128,16 @@ export default function Volunteers() {
     fetchVols()
   }
 
-  function toggleGroup(groupName, isEdit = false) {
+  function toggleItem(key, value, isEdit = false) {
     if (isEdit) {
       setEditForm(f => ({
         ...f,
-        group_names: f.group_names.includes(groupName)
-          ? f.group_names.filter(g => g !== groupName)
-          : [...f.group_names, groupName]
+        [key]: f[key].includes(value) ? f[key].filter(x => x !== value) : [...f[key], value]
       }))
     } else {
       setForm(f => ({
         ...f,
-        group_names: f.group_names.includes(groupName)
-          ? f.group_names.filter(g => g !== groupName)
-          : [...f.group_names, groupName]
+        [key]: f[key].includes(value) ? f[key].filter(x => x !== value) : [...f[key], value]
       }))
     }
   }
@@ -131,6 +154,20 @@ export default function Volunteers() {
     if (!confirm(`確定刪除「${name}」組別？`)) return
     await supabase.from('groups').delete().eq('id', id)
     fetchGroups()
+  }
+
+  async function handleAddSkill() {
+    if (!newSkillName.trim()) return
+    const { error } = await supabase.from('skills').insert({ name: newSkillName.trim() })
+    if (error) return alert('新增失敗，特長名稱可能已存在')
+    setNewSkillName('')
+    fetchSkills()
+  }
+
+  async function handleDeleteSkill(id, name) {
+    if (!confirm(`確定刪除「${name}」特長？`)) return
+    await supabase.from('skills').delete().eq('id', id)
+    fetchSkills()
   }
 
   function askDelete(id) {
@@ -161,6 +198,24 @@ export default function Volunteers() {
     await exportVolunteers(volunteers)
   }
 
+  // 多選標籤元件
+  function TagSelector({ options, selected, onToggle, colorMap = {} }) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {options.map(opt => (
+          <button key={opt} type="button" onClick={() => onToggle(opt)}
+            className={`px-3 py-1 rounded-full text-xs border transition-all ${
+              selected.includes(opt)
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+            }`}>
+            {opt}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   const displayed = volunteers
     .filter(v => {
       if (filter === 'all') return true
@@ -174,6 +229,57 @@ export default function Volunteers() {
       (v.volunteer_no || '').replace(/\D/g, '').includes(search.replace(/\D/g, ''))
     )
 
+  // Modal 表單內容（新增/編輯共用結構）
+  function VolForm({ f, setF, isEdit }) {
+    return (
+      <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">志工編號</label>
+          <input className="input" value={f.volunteer_no}
+            onChange={e => setF(prev => ({ ...prev, volunteer_no: e.target.value }))} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">姓名 *</label>
+          <input className="input" value={f.name}
+            onChange={e => setF(prev => ({ ...prev, name: e.target.value }))} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">組別 * （可多選）</label>
+          <TagSelector options={groups.map(g => g.name)} selected={f.group_names}
+            onToggle={v => toggleItem('group_names', v, isEdit)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">身分別（可多選）</label>
+          <TagSelector options={IDENTITIES} selected={f.identities}
+            onToggle={v => toggleItem('identities', v, isEdit)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">特長（可多選）</label>
+          <TagSelector options={skills.map(s => s.name)} selected={f.skill_names}
+            onToggle={v => toggleItem('skill_names', v, isEdit)} />
+          {adminUnlocked && (
+            <div className="flex gap-2 mt-2">
+              <input className="input flex-1 text-xs" placeholder="新增特長..."
+                value={newSkillName} onChange={e => setNewSkillName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddSkill()} />
+              <button onClick={handleAddSkill} className="btn btn-secondary text-xs">新增</button>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
+          <input className="input" value={f.phone}
+            onChange={e => setF(prev => ({ ...prev, phone: e.target.value }))} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">備註</label>
+          <input className="input" value={f.note}
+            onChange={e => setF(prev => ({ ...prev, note: e.target.value }))} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between gap-2">
@@ -184,7 +290,7 @@ export default function Volunteers() {
           </button>
           <button onClick={async () => {
             const nextNo = await getNextVolNo()
-            setForm(f => ({ ...f, volunteer_no: nextNo }))
+            setForm({ ...emptyForm, volunteer_no: nextNo })
             setShowAdd(true)
           }} className="btn btn-primary text-xs">
             <Plus className="w-4 h-4" /><span className="hidden sm:inline">新增志工</span>
@@ -194,7 +300,7 @@ export default function Volunteers() {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
         {/* 組別篩選卡片 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5 overflow-x-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           <button onClick={() => setFilter('all')}
             className={`card border-t-2 border-t-blue-400 text-left transition-all hover:shadow-md ${filter === 'all' ? 'shadow-md' : ''}`}>
             <div className="text-xs text-gray-400">全體</div>
@@ -217,7 +323,7 @@ export default function Volunteers() {
           })}
           {adminUnlocked && (
             <button onClick={() => setShowAddGroup(true)}
-              className="card border-t-2 border-dashed border-gray-200 text-left hover:shadow-md flex flex-col items-center justify-center py-4">
+              className="card border-t-2 border-dashed border-gray-200 hover:shadow-md flex flex-col items-center justify-center py-4">
               <Plus className="w-5 h-5 text-gray-400" />
               <div className="text-xs text-gray-400 mt-1">管理組別</div>
             </button>
@@ -241,27 +347,26 @@ export default function Volunteers() {
             </button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full" style={{ minWidth: '400px' }}>
+            <table className="w-full" style={{ minWidth: '500px' }}>
               <thead>
                 <tr>
                   <th className="table-th">編號</th>
                   <th className="table-th">姓名</th>
                   <th className="table-th">組別</th>
+                  <th className="table-th hidden sm:table-cell">身分</th>
+                  <th className="table-th hidden sm:table-cell">特長</th>
                   <th className="table-th hidden sm:table-cell">電話</th>
-                  <th className="table-th hidden sm:table-cell">備註</th>
                   <th className="table-th"></th>
                 </tr>
               </thead>
               <tbody>
                 {displayed.length === 0 ? (
-                  <tr><td colSpan={6} className="table-td text-center text-gray-400 py-8">尚無志工資料</td></tr>
+                  <tr><td colSpan={7} className="table-td text-center text-gray-400 py-8">尚無志工資料</td></tr>
                 ) : displayed.map(v => {
                   const gnames = v.group_names?.length ? v.group_names : [v.group_name].filter(Boolean)
                   return (
                     <tr key={v.id}>
-                      <td className="table-td text-gray-500 font-mono whitespace-nowrap">
-                        {v.volunteer_no || '—'}
-                      </td>
+                      <td className="table-td text-gray-500 font-mono whitespace-nowrap">{v.volunteer_no || '—'}</td>
                       <td className="table-td">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
@@ -277,8 +382,21 @@ export default function Volunteers() {
                           ))}
                         </div>
                       </td>
+                      <td className="table-td hidden sm:table-cell">
+                        <div className="flex gap-1 flex-wrap">
+                          {(v.identities || []).map(i => (
+                            <span key={i} className="badge badge-gray text-xs">{i}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="table-td hidden sm:table-cell">
+                        <div className="flex gap-1 flex-wrap">
+                          {(v.skill_names || []).map(s => (
+                            <span key={s} className="badge badge-blue text-xs">{s}</span>
+                          ))}
+                        </div>
+                      </td>
                       <td className="table-td text-gray-500 hidden sm:table-cell">{v.phone || '—'}</td>
-                      <td className="table-td text-gray-400 hidden sm:table-cell">{v.note || '—'}</td>
                       <td className="table-td">
                         <div className="flex gap-1">
                           {adminUnlocked && (
@@ -310,45 +428,7 @@ export default function Volunteers() {
               <h3 className="font-semibold text-sm">新增志工</h3>
               <button onClick={() => setShowAdd(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
             </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">志工編號</label>
-                <input className="input" placeholder="例如 V001"
-                  value={form.volunteer_no}
-                  onChange={e => setForm(f => ({ ...f, volunteer_no: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">姓名 *</label>
-                <input className="input" value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">組別 * （可多選）</label>
-                <div className="flex flex-wrap gap-2">
-                  {groups.map(g => (
-                    <button key={g.id} type="button"
-                      onClick={() => toggleGroup(g.name)}
-                      className={`px-3 py-1 rounded-full text-xs border transition-all ${
-                        form.group_names.includes(g.name)
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
-                      }`}>
-                      {g.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
-                <input className="input" value={form.phone}
-                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">備註</label>
-                <input className="input" value={form.note}
-                  onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
-              </div>
-            </div>
+            <VolForm f={form} setF={setForm} isEdit={false} />
             <div className="flex gap-2 mt-5">
               <button onClick={handleAdd} disabled={submitting}
                 className="btn btn-primary flex-1 justify-center disabled:opacity-60">
@@ -368,44 +448,7 @@ export default function Volunteers() {
               <h3 className="font-semibold text-sm">編輯志工</h3>
               <button onClick={() => setShowEdit(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
             </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">志工編號</label>
-                <input className="input" value={editForm.volunteer_no}
-                  onChange={e => setEditForm(f => ({ ...f, volunteer_no: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">姓名 *</label>
-                <input className="input" value={editForm.name}
-                  onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">組別 * （可多選）</label>
-                <div className="flex flex-wrap gap-2">
-                  {groups.map(g => (
-                    <button key={g.id} type="button"
-                      onClick={() => toggleGroup(g.name, true)}
-                      className={`px-3 py-1 rounded-full text-xs border transition-all ${
-                        editForm.group_names.includes(g.name)
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
-                      }`}>
-                      {g.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
-                <input className="input" value={editForm.phone}
-                  onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">備註</label>
-                <input className="input" value={editForm.note}
-                  onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} />
-              </div>
-            </div>
+            <VolForm f={editForm} setF={setEditForm} isEdit={true} />
             <div className="flex gap-2 mt-5">
               <button onClick={handleEdit} disabled={submitting}
                 className="btn btn-primary flex-1 justify-center disabled:opacity-60">
