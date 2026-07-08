@@ -28,30 +28,53 @@ function applyDataStyle(row, even) {
 }
 
 // 志工名單
-export async function exportVolunteers(volunteers) {
+export async function exportVolunteers(volunteers, selectedCols) {
   const wb = new ExcelJS.Workbook()
   wb.creator = '台灣癌症基金會'
   const ws = wb.addWorksheet('志工名單')
 
-  ws.mergeCells('A1:E1')
+  const ALL_COLS = [
+    { key: 'volunteer_no', label: '編號', width: 10 },
+    { key: 'name', label: '姓名', width: 14 },
+    { key: 'group_names', label: '組別', width: 16 },
+    { key: 'identities', label: '身分別', width: 20 },
+    { key: 'skill_names', label: '特長', width: 20 },
+    { key: 'phone', label: '電話', width: 16 },
+    { key: 'note', label: '備註', width: 24 },
+    { key: 'created_at', label: '加入日期', width: 14 },
+  ]
+
+  const cols = selectedCols
+    ? ALL_COLS.filter(c => selectedCols.includes(c.key))
+    : ALL_COLS
+
+  const colCount = cols.length
+  const lastCol = String.fromCharCode(64 + colCount)
+
+  ws.mergeCells(`A1:${lastCol}1`)
   const title = ws.getCell('A1')
   title.value = '台灣癌症基金會 - 志工名單'
   title.font = { bold: true, size: 14 }
   title.alignment = { horizontal: 'center' }
 
   ws.addRow([])
-  const hdr = ws.addRow(['姓名', '組別', '電話', '備註', '加入日期'])
+  const hdr = ws.addRow(cols.map(c => c.label))
   hdr.height = 22
   applyHeaderStyle(hdr)
-  ws.columns = [
-    { width: 14 }, { width: 10 }, { width: 16 }, { width: 24 }, { width: 14 }
-  ]
+  ws.columns = cols.map(c => ({ width: c.width }))
 
   volunteers.forEach((v, i) => {
-    const row = ws.addRow([
-      v.name, v.group_name, v.phone || '—', v.note || '—',
-      v.created_at ? format(new Date(v.created_at), 'yyyy/MM/dd') : '—'
-    ])
+    const rowData = cols.map(c => {
+      if (c.key === 'group_names') {
+        const g = v.group_names?.length ? v.group_names : [v.group_name].filter(Boolean)
+        return g.join('、') || '—'
+      }
+      if (c.key === 'identities') return (v.identities || []).join('、') || '—'
+      if (c.key === 'skill_names') return (v.skill_names || []).join('、') || '—'
+      if (c.key === 'created_at') return v.created_at ? format(new Date(v.created_at), 'yyyy/MM/dd') : '—'
+      return v[c.key] || '—'
+    })
+    const row = ws.addRow(rowData)
     row.height = 18
     applyDataStyle(row, i % 2 === 0)
   })

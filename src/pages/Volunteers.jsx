@@ -1,7 +1,7 @@
 import { exportVolunteers } from '../lib/excel'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Plus, Trash2, Download, Search, X, Pencil } from 'lucide-react'
+import { Plus, Trash2, Download, Search, X, Pencil, Filter } from 'lucide-react'
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD
 
@@ -19,14 +19,29 @@ const emptyForm = {
   identities: [], skill_names: [], phone: '', note: ''
 }
 
+const ALL_EXPORT_COLS = [
+  { key: 'volunteer_no', label: '編號' },
+  { key: 'name', label: '姓名' },
+  { key: 'group_names', label: '組別' },
+  { key: 'identities', label: '身分別' },
+  { key: 'skill_names', label: '特長' },
+  { key: 'phone', label: '電話' },
+  { key: 'note', label: '備註' },
+  { key: 'created_at', label: '加入日期' },
+]
+
 export default function Volunteers() {
   const [volunteers, setVolunteers] = useState([])
   const [groups, setGroups] = useState([])
   const [skills, setSkills] = useState([])
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [filterIdentity, setFilterIdentity] = useState('all')
+  const [filterSkill, setFilterSkill] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportCols, setExportCols] = useState(ALL_EXPORT_COLS.map(c => c.key))
   const [editTarget, setEditTarget] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [editForm, setEditForm] = useState(emptyForm)
@@ -194,12 +209,7 @@ export default function Volunteers() {
     }
   }
 
-  async function handleExport() {
-    await exportVolunteers(volunteers)
-  }
-
-  // 多選標籤元件
-  function TagSelector({ options, selected, onToggle, colorMap = {} }) {
+  function TagSelector({ options, selected, onToggle }) {
     return (
       <div className="flex flex-wrap gap-2">
         {options.map(opt => (
@@ -216,20 +226,6 @@ export default function Volunteers() {
     )
   }
 
-  const displayed = volunteers
-    .filter(v => {
-      if (filter === 'all') return true
-      const gnames = v.group_names?.length ? v.group_names : [v.group_name]
-      return gnames.includes(filter)
-    })
-    .filter(v => !search ||
-      v.name.includes(search) ||
-      (v.phone || '').includes(search) ||
-      (v.volunteer_no || '').includes(search) ||
-      (v.volunteer_no || '').replace(/\D/g, '').includes(search.replace(/\D/g, ''))
-    )
-
-  // Modal 表單內容（新增/編輯共用結構）
   function VolForm({ f, setF, isEdit }) {
     return (
       <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
@@ -280,12 +276,27 @@ export default function Volunteers() {
     )
   }
 
+  const displayed = volunteers
+    .filter(v => {
+      if (filter === 'all') return true
+      const gnames = v.group_names?.length ? v.group_names : [v.group_name]
+      return gnames.includes(filter)
+    })
+    .filter(v => filterIdentity === 'all' || (v.identities || []).includes(filterIdentity))
+    .filter(v => filterSkill === 'all' || (v.skill_names || []).includes(filterSkill))
+    .filter(v => !search ||
+      v.name.includes(search) ||
+      (v.phone || '').includes(search) ||
+      (v.volunteer_no || '').includes(search) ||
+      (v.volunteer_no || '').replace(/\D/g, '').includes(search.replace(/\D/g, ''))
+    )
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between gap-2">
         <h1 className="text-base font-semibold text-gray-800 shrink-0">志工資料管理</h1>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="btn btn-success text-xs">
+          <button onClick={() => setShowExportModal(true)} className="btn btn-success text-xs">
             <Download className="w-4 h-4" /><span className="hidden sm:inline">匯出 Excel</span>
           </button>
           <button onClick={async () => {
@@ -300,7 +311,7 @@ export default function Volunteers() {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
         {/* 組別篩選卡片 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <button onClick={() => setFilter('all')}
             className={`card border-t-2 border-t-blue-400 text-left transition-all hover:shadow-md ${filter === 'all' ? 'shadow-md' : ''}`}>
             <div className="text-xs text-gray-400">全體</div>
@@ -331,12 +342,23 @@ export default function Volunteers() {
         </div>
 
         <div className="card">
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <div className="relative flex-1 min-w-0">
+          {/* 篩選列 */}
+          <div className="flex gap-2 mb-3 flex-wrap items-center">
+            <div className="relative flex-1 min-w-[160px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input className="input pl-8 text-xs w-full" placeholder="搜尋姓名、編號或電話..."
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
+            <select className="input w-auto text-xs" value={filterIdentity}
+              onChange={e => setFilterIdentity(e.target.value)}>
+              <option value="all">所有身分</option>
+              {IDENTITIES.map(i => <option key={i} value={i}>{i}</option>)}
+            </select>
+            <select className="input w-auto text-xs" value={filterSkill}
+              onChange={e => setFilterSkill(e.target.value)}>
+              <option value="all">所有特長</option>
+              {skills.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
             <span className="text-xs text-gray-400 shrink-0">共 {displayed.length} 人</span>
             {adminUnlocked && <span className="badge badge-red">管理員模式</span>}
             <button onClick={() => {
@@ -346,6 +368,7 @@ export default function Volunteers() {
               {adminUnlocked ? '登出管理員' : '🔒 管理員'}
             </button>
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full" style={{ minWidth: '500px' }}>
               <thead>
@@ -377,36 +400,28 @@ export default function Volunteers() {
                       </td>
                       <td className="table-td">
                         <div className="flex gap-1 flex-wrap">
-                          {gnames.map(g => (
-                            <span key={g} className={`badge ${GROUP_COLORS[g] || 'badge-gray'}`}>{g}</span>
-                          ))}
+                          {gnames.map(g => <span key={g} className={`badge ${GROUP_COLORS[g] || 'badge-gray'}`}>{g}</span>)}
                         </div>
                       </td>
                       <td className="table-td hidden sm:table-cell">
                         <div className="flex gap-1 flex-wrap">
-                          {(v.identities || []).map(i => (
-                            <span key={i} className="badge badge-gray text-xs">{i}</span>
-                          ))}
+                          {(v.identities || []).map(i => <span key={i} className="badge badge-gray text-xs">{i}</span>)}
                         </div>
                       </td>
                       <td className="table-td hidden sm:table-cell">
                         <div className="flex gap-1 flex-wrap">
-                          {(v.skill_names || []).map(s => (
-                            <span key={s} className="badge badge-blue text-xs">{s}</span>
-                          ))}
+                          {(v.skill_names || []).map(s => <span key={s} className="badge badge-blue text-xs">{s}</span>)}
                         </div>
                       </td>
                       <td className="table-td text-gray-500 hidden sm:table-cell">{v.phone || '—'}</td>
                       <td className="table-td">
                         <div className="flex gap-1">
                           {adminUnlocked && (
-                            <button onClick={() => openEdit(v)}
-                              className="p-1 text-gray-300 hover:text-blue-500 transition-colors">
+                            <button onClick={() => openEdit(v)} className="p-1 text-gray-300 hover:text-blue-500 transition-colors">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          <button onClick={() => askDelete(v.id)}
-                            className="p-1 text-gray-300 hover:text-red-500 transition-colors">
+                          <button onClick={() => askDelete(v.id)} className="p-1 text-gray-300 hover:text-red-500 transition-colors">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -419,6 +434,41 @@ export default function Volunteers() {
           </div>
         </div>
       </div>
+
+      {/* 匯出設定 Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm">選擇匯出欄位</h3>
+              <button onClick={() => setShowExportModal(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">將匯出目前篩選結果（{displayed.length} 人）</p>
+            <div className="space-y-2 mb-4">
+              {ALL_EXPORT_COLS.map(col => (
+                <label key={col.key} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" className="w-4 h-4"
+                    checked={exportCols.includes(col.key)}
+                    onChange={e => {
+                      if (e.target.checked) setExportCols(prev => [...prev, col.key])
+                      else setExportCols(prev => prev.filter(k => k !== col.key))
+                    }} />
+                  <span className="text-sm text-gray-700">{col.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={async () => {
+                await exportVolunteers(displayed, exportCols)
+                setShowExportModal(false)
+              }} className="btn btn-success flex-1 justify-center">
+                <Download className="w-4 h-4" />匯出
+              </button>
+              <button onClick={() => setShowExportModal(false)} className="btn btn-secondary">取消</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 新增志工 Modal */}
       {showAdd && (
@@ -485,8 +535,7 @@ export default function Volunteers() {
                   {groups.map(g => (
                     <div key={g.id} className="flex items-center justify-between py-1.5 border-b border-gray-50">
                       <span className="text-sm">{g.name}</span>
-                      <button onClick={() => handleDeleteGroup(g.id, g.name)}
-                        className="p-1 text-gray-300 hover:text-red-500">
+                      <button onClick={() => handleDeleteGroup(g.id, g.name)} className="p-1 text-gray-300 hover:text-red-500">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
