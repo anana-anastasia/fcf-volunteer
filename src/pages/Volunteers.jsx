@@ -54,6 +54,7 @@ export default function Volunteers() {
   const [newGroupName, setNewGroupName] = useState('')
   const [newSkillName, setNewSkillName] = useState('')
   const [showAddGroup, setShowAddGroup] = useState(false)
+  const [showAddSkill, setShowAddSkill] = useState(false)
 
   useEffect(() => { fetchVols(); fetchGroups(); fetchSkills() }, [])
 
@@ -333,12 +334,19 @@ export default function Volunteers() {
             )
           })}
           {adminUnlocked && (
-            <button onClick={() => setShowAddGroup(true)}
-              className="card border-t-2 border-dashed border-gray-200 hover:shadow-md flex flex-col items-center justify-center py-4">
-              <Plus className="w-5 h-5 text-gray-400" />
-              <div className="text-xs text-gray-400 mt-1">管理組別</div>
-            </button>
-          )}
+  <>
+    <button onClick={() => setShowAddGroup(true)}
+      className="card border-t-2 border-dashed border-gray-200 hover:shadow-md flex flex-col items-center justify-center py-4">
+      <Plus className="w-5 h-5 text-gray-400" />
+      <div className="text-xs text-gray-400 mt-1">管理組別</div>
+    </button>
+    <button onClick={() => setShowAddSkill(true)}
+      className="card border-t-2 border-dashed border-gray-200 hover:shadow-md flex flex-col items-center justify-center py-4">
+      <Plus className="w-5 h-5 text-gray-400" />
+      <div className="text-xs text-gray-400 mt-1">管理特長</div>
+    </button>
+  </>
+)}
         </div>
 
         <div className="card">
@@ -548,6 +556,43 @@ export default function Volunteers() {
         </div>
       )}
 
+      {/* 管理特長 Modal */}
+{showAddSkill && (
+  <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-sm">管理特長</h3>
+        <button onClick={() => setShowAddSkill(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">新增特長</label>
+          <div className="flex gap-2">
+            <input className="input flex-1" value={newSkillName}
+              onChange={e => setNewSkillName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddSkill()}
+              placeholder="輸入特長名稱" />
+            <button onClick={handleAddSkill} className="btn btn-primary">新增</button>
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-2">現有特長</label>
+          <div className="space-y-1">
+            {skills.map(s => (
+              <div key={s.id} className="flex items-center justify-between py-1.5 border-b border-gray-50">
+                <span className="text-sm">{s.name}</span>
+                <button onClick={() => handleDeleteSkill(s.id, s.name)} className="p-1 text-gray-300 hover:text-red-500">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <button onClick={() => setShowAddSkill(false)} className="btn btn-secondary w-full justify-center mt-4">關閉</button>
+    </div>
+  </div>
+)}
       {/* 管理員 Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
