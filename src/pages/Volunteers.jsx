@@ -1,7 +1,7 @@
 import { exportVolunteers } from '../lib/excel'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Plus, Trash2, Download, Search, X, Pencil, Filter } from 'lucide-react'
+import { Plus, Trash2, Download, Search, X, Pencil } from 'lucide-react'
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD
 
@@ -30,6 +30,84 @@ const ALL_EXPORT_COLS = [
   { key: 'created_at', label: '加入日期' },
 ]
 
+// VolForm 移到元件外面，避免每次 render 重新建立導致輸入框失焦
+function VolForm({ f, setF, isEdit, groups, skills, adminUnlocked, newSkillName, setNewSkillName, toggleItem, handleAddSkill }) {
+  return (
+    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">志工編號</label>
+        <input className="input" value={f.volunteer_no}
+          onChange={e => setF(prev => ({ ...prev, volunteer_no: e.target.value }))} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">姓名 *</label>
+        <input className="input" value={f.name}
+          onChange={e => setF(prev => ({ ...prev, name: e.target.value }))} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">組別 * （可多選）</label>
+        <div className="flex flex-wrap gap-2">
+          {groups.map(g => (
+            <button key={g.id} type="button"
+              onClick={() => toggleItem('group_names', g.name, isEdit)}
+              className={`px-3 py-1 rounded-full text-xs border transition-all ${
+                f.group_names.includes(g.name)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+              }`}>{g.name}</button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">身分別（可多選）</label>
+        <div className="flex flex-wrap gap-2">
+          {IDENTITIES.map(opt => (
+            <button key={opt} type="button"
+              onClick={() => toggleItem('identities', opt, isEdit)}
+              className={`px-3 py-1 rounded-full text-xs border transition-all ${
+                f.identities.includes(opt)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+              }`}>{opt}</button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">特長（可多選）</label>
+        <div className="flex flex-wrap gap-2">
+          {skills.map(s => (
+            <button key={s.id} type="button"
+              onClick={() => toggleItem('skill_names', s.name, isEdit)}
+              className={`px-3 py-1 rounded-full text-xs border transition-all ${
+                f.skill_names.includes(s.name)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+              }`}>{s.name}</button>
+          ))}
+        </div>
+        {adminUnlocked && (
+          <div className="flex gap-2 mt-2">
+            <input className="input flex-1 text-xs" placeholder="新增特長..."
+              value={newSkillName} onChange={e => setNewSkillName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddSkill()} />
+            <button onClick={handleAddSkill} className="btn btn-secondary text-xs">新增</button>
+          </div>
+        )}
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
+        <input className="input" value={f.phone}
+          onChange={e => setF(prev => ({ ...prev, phone: e.target.value }))} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">備註</label>
+        <input className="input" value={f.note}
+          onChange={e => setF(prev => ({ ...prev, note: e.target.value }))} />
+      </div>
+    </div>
+  )
+}
+
 export default function Volunteers() {
   const [volunteers, setVolunteers] = useState([])
   const [groups, setGroups] = useState([])
@@ -41,6 +119,8 @@ export default function Volunteers() {
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [showAddGroup, setShowAddGroup] = useState(false)
+  const [showAddSkill, setShowAddSkill] = useState(false)
   const [exportCols, setExportCols] = useState(ALL_EXPORT_COLS.map(c => c.key))
   const [editTarget, setEditTarget] = useState(null)
   const [form, setForm] = useState(emptyForm)
@@ -53,8 +133,6 @@ export default function Volunteers() {
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [newGroupName, setNewGroupName] = useState('')
   const [newSkillName, setNewSkillName] = useState('')
-  const [showAddGroup, setShowAddGroup] = useState(false)
-  const [showAddSkill, setShowAddSkill] = useState(false)
 
   useEffect(() => { fetchVols(); fetchGroups(); fetchSkills() }, [])
 
@@ -210,73 +288,6 @@ export default function Volunteers() {
     }
   }
 
-  function TagSelector({ options, selected, onToggle }) {
-    return (
-      <div className="flex flex-wrap gap-2">
-        {options.map(opt => (
-          <button key={opt} type="button" onClick={() => onToggle(opt)}
-            className={`px-3 py-1 rounded-full text-xs border transition-all ${
-              selected.includes(opt)
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
-            }`}>
-            {opt}
-          </button>
-        ))}
-      </div>
-    )
-  }
-
-  function VolForm({ f, setF, isEdit }) {
-    return (
-      <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">志工編號</label>
-          <input className="input" value={f.volunteer_no}
-            onChange={e => setF(prev => ({ ...prev, volunteer_no: e.target.value }))} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">姓名 *</label>
-          <input className="input" value={f.name}
-            onChange={e => setF(prev => ({ ...prev, name: e.target.value }))} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">組別 * （可多選）</label>
-          <TagSelector options={groups.map(g => g.name)} selected={f.group_names}
-            onToggle={v => toggleItem('group_names', v, isEdit)} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">身分別（可多選）</label>
-          <TagSelector options={IDENTITIES} selected={f.identities}
-            onToggle={v => toggleItem('identities', v, isEdit)} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">特長（可多選）</label>
-          <TagSelector options={skills.map(s => s.name)} selected={f.skill_names}
-            onToggle={v => toggleItem('skill_names', v, isEdit)} />
-          {adminUnlocked && (
-            <div className="flex gap-2 mt-2">
-              <input className="input flex-1 text-xs" placeholder="新增特長..."
-                value={newSkillName} onChange={e => setNewSkillName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAddSkill()} />
-              <button onClick={handleAddSkill} className="btn btn-secondary text-xs">新增</button>
-            </div>
-          )}
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">電話</label>
-          <input className="input" value={f.phone}
-            onChange={e => setF(prev => ({ ...prev, phone: e.target.value }))} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">備註</label>
-          <input className="input" value={f.note}
-            onChange={e => setF(prev => ({ ...prev, note: e.target.value }))} />
-        </div>
-      </div>
-    )
-  }
-
   const displayed = volunteers
     .filter(v => {
       if (filter === 'all') return true
@@ -291,6 +302,10 @@ export default function Volunteers() {
       (v.volunteer_no || '').includes(search) ||
       (v.volunteer_no || '').replace(/\D/g, '').includes(search.replace(/\D/g, ''))
     )
+
+  const volFormProps = {
+    groups, skills, adminUnlocked, newSkillName, setNewSkillName, toggleItem, handleAddSkill
+  }
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -311,7 +326,6 @@ export default function Volunteers() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
-        {/* 組別篩選卡片 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <button onClick={() => setFilter('all')}
             className={`card border-t-2 border-t-blue-400 text-left transition-all hover:shadow-md ${filter === 'all' ? 'shadow-md' : ''}`}>
@@ -334,23 +348,22 @@ export default function Volunteers() {
             )
           })}
           {adminUnlocked && (
-  <>
-    <button onClick={() => setShowAddGroup(true)}
-      className="card border-t-2 border-dashed border-gray-200 hover:shadow-md flex flex-col items-center justify-center py-4">
-      <Plus className="w-5 h-5 text-gray-400" />
-      <div className="text-xs text-gray-400 mt-1">管理組別</div>
-    </button>
-    <button onClick={() => setShowAddSkill(true)}
-      className="card border-t-2 border-dashed border-gray-200 hover:shadow-md flex flex-col items-center justify-center py-4">
-      <Plus className="w-5 h-5 text-gray-400" />
-      <div className="text-xs text-gray-400 mt-1">管理特長</div>
-    </button>
-  </>
-)}
+            <>
+              <button onClick={() => setShowAddGroup(true)}
+                className="card border-t-2 border-dashed border-gray-200 hover:shadow-md flex flex-col items-center justify-center py-4">
+                <Plus className="w-5 h-5 text-gray-400" />
+                <div className="text-xs text-gray-400 mt-1">管理組別</div>
+              </button>
+              <button onClick={() => setShowAddSkill(true)}
+                className="card border-t-2 border-dashed border-gray-200 hover:shadow-md flex flex-col items-center justify-center py-4">
+                <Plus className="w-5 h-5 text-gray-400" />
+                <div className="text-xs text-gray-400 mt-1">管理特長</div>
+              </button>
+            </>
+          )}
         </div>
 
         <div className="card">
-          {/* 篩選列 */}
           <div className="flex gap-2 mb-3 flex-wrap items-center">
             <div className="relative flex-1 min-w-[160px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -486,7 +499,7 @@ export default function Volunteers() {
               <h3 className="font-semibold text-sm">新增志工</h3>
               <button onClick={() => setShowAdd(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
             </div>
-            <VolForm f={form} setF={setForm} isEdit={false} />
+            <VolForm f={form} setF={setForm} isEdit={false} {...volFormProps} />
             <div className="flex gap-2 mt-5">
               <button onClick={handleAdd} disabled={submitting}
                 className="btn btn-primary flex-1 justify-center disabled:opacity-60">
@@ -506,7 +519,7 @@ export default function Volunteers() {
               <h3 className="font-semibold text-sm">編輯志工</h3>
               <button onClick={() => setShowEdit(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
             </div>
-            <VolForm f={editForm} setF={setEditForm} isEdit={true} />
+            <VolForm f={editForm} setF={setEditForm} isEdit={true} {...volFormProps} />
             <div className="flex gap-2 mt-5">
               <button onClick={handleEdit} disabled={submitting}
                 className="btn btn-primary flex-1 justify-center disabled:opacity-60">
@@ -557,42 +570,43 @@ export default function Volunteers() {
       )}
 
       {/* 管理特長 Modal */}
-{showAddSkill && (
-  <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
-    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-sm">管理特長</h3>
-        <button onClick={() => setShowAddSkill(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
-      </div>
-      <div className="space-y-3">
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">新增特長</label>
-          <div className="flex gap-2">
-            <input className="input flex-1" value={newSkillName}
-              onChange={e => setNewSkillName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddSkill()}
-              placeholder="輸入特長名稱" />
-            <button onClick={handleAddSkill} className="btn btn-primary">新增</button>
-          </div>
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600 block mb-2">現有特長</label>
-          <div className="space-y-1">
-            {skills.map(s => (
-              <div key={s.id} className="flex items-center justify-between py-1.5 border-b border-gray-50">
-                <span className="text-sm">{s.name}</span>
-                <button onClick={() => handleDeleteSkill(s.id, s.name)} className="p-1 text-gray-300 hover:text-red-500">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+      {showAddSkill && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm">管理特長</h3>
+              <button onClick={() => setShowAddSkill(false)} className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">新增特長</label>
+                <div className="flex gap-2">
+                  <input className="input flex-1" value={newSkillName}
+                    onChange={e => setNewSkillName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddSkill()}
+                    placeholder="輸入特長名稱" />
+                  <button onClick={handleAddSkill} className="btn btn-primary">新增</button>
+                </div>
               </div>
-            ))}
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-2">現有特長</label>
+                <div className="space-y-1">
+                  {skills.map(s => (
+                    <div key={s.id} className="flex items-center justify-between py-1.5 border-b border-gray-50">
+                      <span className="text-sm">{s.name}</span>
+                      <button onClick={() => handleDeleteSkill(s.id, s.name)} className="p-1 text-gray-300 hover:text-red-500">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button onClick={() => setShowAddSkill(false)} className="btn btn-secondary w-full justify-center mt-4">關閉</button>
           </div>
         </div>
-      </div>
-      <button onClick={() => setShowAddSkill(false)} className="btn btn-secondary w-full justify-center mt-4">關閉</button>
-    </div>
-  </div>
-)}
+      )}
+
       {/* 管理員 Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
