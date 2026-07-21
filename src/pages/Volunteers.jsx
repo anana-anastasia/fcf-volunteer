@@ -30,7 +30,6 @@ const ALL_EXPORT_COLS = [
   { key: 'created_at', label: '加入日期' },
 ]
 
-// VolForm 移到元件外面，避免每次 render 重新建立導致輸入框失焦
 function VolForm({ f, setF, isEdit, groups, skills, adminUnlocked, newSkillName, setNewSkillName, toggleItem, handleAddSkill }) {
   return (
     <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
@@ -288,6 +287,10 @@ export default function Volunteers() {
     }
   }
 
+  async function handleExport() {
+    await exportVolunteers(displayed, exportCols)
+  }
+
   const displayed = volunteers
     .filter(v => {
       if (filter === 'all') return true
@@ -296,12 +299,34 @@ export default function Volunteers() {
     })
     .filter(v => filterIdentity === 'all' || (v.identities || []).includes(filterIdentity))
     .filter(v => filterSkill === 'all' || (v.skill_names || []).includes(filterSkill))
-    .filter(v => !search ||
-      v.name.includes(search) ||
-      (v.phone || '').includes(search) ||
-      (v.volunteer_no || '').includes(search) ||
-      (v.volunteer_no || '').replace(/\D/g, '').includes(search.replace(/\D/g, ''))
-    )
+    .filter(v => {
+  if (!search) return true
+  const kw = search.trim()
+  const numOnly = kw.replace(/\D/g, '')
+  return (
+    v.name.includes(kw) ||
+    (v.phone || '').includes(kw) ||
+    (v.volunteer_no || '').includes(kw) ||
+    (numOnly && (v.volunteer_no || '').replace(/\D/g, '').includes(numOnly))
+  )
+})
+.sort((a, b) => {
+  const kw = search.trim()
+  const numOnly = kw.replace(/\D/g, '')
+  const aNo = parseInt((a.volunteer_no || '').replace(/\D/g, '')) || 99999
+  const bNo = parseInt((b.volunteer_no || '').replace(/\D/g, '')) || 99999
+  const aNoMatch = numOnly && (a.volunteer_no || '').replace(/\D/g, '').includes(numOnly)
+  const bNoMatch = numOnly && (b.volunteer_no || '').replace(/\D/g, '').includes(numOnly)
+  if (aNoMatch && !bNoMatch) return -1
+  if (!aNoMatch && bNoMatch) return 1
+  if (numOnly) {
+    const aExact = (a.volunteer_no || '').replace(/\D/g, '') === numOnly
+    const bExact = (b.volunteer_no || '').replace(/\D/g, '') === numOnly
+    if (aExact && !bExact) return -1
+    if (!aExact && bExact) return 1
+  }
+  return aNo - bNo
+})
 
   const volFormProps = {
     groups, skills, adminUnlocked, newSkillName, setNewSkillName, toggleItem, handleAddSkill

@@ -6,10 +6,51 @@ import { CheckCircle2, Search, LogOut, Trash2, X } from 'lucide-react'
 const GROUP_BADGE = {
   行政: 'badge-purple',
   捐髮: 'badge-amber',
-  關懷: 'badge-teal'
+  關懷: 'badge-teal',
+  機動: 'badge-blue',
 }
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD
+
+const TIME_OPTIONS = []
+for (let h = 0; h < 24; h++) {
+  for (let m of [0, 30]) {
+    const hh = String(h).padStart(2, '0')
+    const mm = String(m).padStart(2, '0')
+    TIME_OPTIONS.push(`${hh}:${mm}`)
+  }
+}
+
+function searchAndSort(list, keyword) {
+  if (!keyword.trim()) return []
+  const kw = keyword.trim()
+  const numOnly = kw.replace(/\D/g, '')
+  const filtered = list.filter(v =>
+    v.name.includes(kw) ||
+    (v.volunteer_no || '').includes(kw) ||
+    (numOnly && (v.volunteer_no || '').replace(/\D/g, '').includes(numOnly)) ||
+    (v.phone || '').includes(kw)
+  )
+  return filtered.sort((a, b) => {
+    const aNo = parseInt((a.volunteer_no || '').replace(/\D/g, '')) || 99999
+    const bNo = parseInt((b.volunteer_no || '').replace(/\D/g, '')) || 99999
+    const aNoMatch = numOnly && (a.volunteer_no || '').replace(/\D/g, '').includes(numOnly)
+    const bNoMatch = numOnly && (b.volunteer_no || '').replace(/\D/g, '').includes(numOnly)
+    if (aNoMatch && !bNoMatch) return -1
+    if (!aNoMatch && bNoMatch) return 1
+    if (numOnly) {
+      const aExact = (a.volunteer_no || '').replace(/\D/g, '') === numOnly
+      const bExact = (b.volunteer_no || '').replace(/\D/g, '') === numOnly
+      if (aExact && !bExact) return -1
+      if (!aExact && bExact) return 1
+      const aStart = (a.volunteer_no || '').replace(/\D/g, '').startsWith(numOnly)
+      const bStart = (b.volunteer_no || '').replace(/\D/g, '').startsWith(numOnly)
+      if (aStart && !bStart) return -1
+      if (!aStart && bStart) return 1
+    }
+    return aNo - bNo
+  })
+}
 
 export default function Checkin() {
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -17,20 +58,24 @@ export default function Checkin() {
   const [checkins, setCheckins] = useState([])
   const [search, setSearch] = useState('')
   const [manualName, setManualName] = useState('')
+  const [manualVolId, setManualVolId] = useState('')
+  const [showManualList, setShowManualList] = useState(false)
   const [adminUnlocked, setAdminUnlocked] = useState(false)
   const [showAdminModal, setShowAdminModal] = useState(false)
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState('')
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [allVolunteers, setAllVolunteers] = useState([])
-  const [showManualList, setShowManualList] = useState(false)
-  const [manualVolId, setManualVolId] = useState('')
-  const [backfillForm, setBackfillForm] = useState({ volunteer_id: '', volSearch: '', date: today, time_in: '', time_out: '' })
+  const [backfillName, setBackfillName] = useState('')
+  const [backfillVolId, setBackfillVolId] = useState('')
   const [showBackfillList, setShowBackfillList] = useState(false)
+  const [backfillDate, setBackfillDate] = useState(today)
+  const [backfillIn, setBackfillIn] = useState('')
+  const [backfillOut, setBackfillOut] = useState('')
 
   useEffect(() => {
     fetchData()
-    supabase.from('volunteers').select('id, name, volunteer_no, phone, group_name').order('name')
+    supabase.from('volunteers').select('id, name, volunteer_no, phone, group_name, group_names').order('name')
       .then(({ data }) => { if (data) setAllVolunteers(data) })
   }, [])
 
@@ -93,31 +138,27 @@ export default function Checkin() {
     fetchData()
   }
 
-const handleManualCheckout = async (checkinId) => {
-  const { error } = await supabase.from('checkins')
-    .update({ checked_out_at: new Date().toISOString() })
-    .eq('id', checkinId)
-  if (error) return alert('簽退失敗')
-  fetchData()
-}
-
-  async function handleBackfillCheckin() {
-    if (!backfillForm.volunteer_id) return alert('請先選擇志工')
-    if (!backfillForm.date || !backfillForm.time_in) return alert('請填寫日期與簽到時間')
-    const checked_in_at = new Date(`${backfillForm.date}T${backfillForm.time_in}:00`).toISOString()
-    const checked_out_at = backfillForm.time_out
-      ? new Date(`${backfillForm.date}T${backfillForm.time_out}:00`).toISOString()
+  const handleBackfill = async () => {
+    if (!backfillVolId) return alert('請先選擇志工')
+    if (!backfillIn && !backfillOut) return alert('請至少填寫簽到或簽退時間')
+    const checkinAt = backfillIn
+      ? new Date(`${backfillDate}T${backfillIn}:00`).toISOString()
+      : new Date(`${backfillDate}T00:00:00`).toISOString()
+    const checkoutAt = backfillOut
+      ? new Date(`${backfillDate}T${backfillOut}:00`).toISOString()
       : null
     const { error } = await supabase.from('checkins').insert({
-      volunteer_id: backfillForm.volunteer_id,
-      checked_in_at,
-      checked_out_at
+      volunteer_id: backfillVolId,
+      checked_in_at: checkinAt,
+      checked_out_at: checkoutAt,
     })
     if (error) return alert('補簽到失敗')
-    setBackfillForm({ volunteer_id: '', volSearch: '', date: today, time_in: '', time_out: '' })
-    setShowBackfillList(false)
+    setBackfillName('')
+    setBackfillVolId('')
+    setBackfillDate(today)
+    setBackfillIn('')
+    setBackfillOut('')
     fetchData()
-    alert(backfillForm.date === today ? '補簽到成功' : '補簽到成功，可至「服務紀錄」查看')
   }
 
   function askDelete(id) {
@@ -146,6 +187,8 @@ const handleManualCheckout = async (checkinId) => {
   const filtered = todayShifts.filter(s =>
     !search || s.volunteer_name?.includes(search)
   )
+  const filteredManual = searchAndSort(allVolunteers, manualName)
+  const filteredBackfill = searchAndSort(allVolunteers, backfillName)
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -156,9 +199,8 @@ const handleManualCheckout = async (checkinId) => {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* 左欄 */}
           <div className="space-y-4">
+
             {/* 今日班表 */}
             <div className="card">
               <div className="font-medium text-sm text-gray-700 mb-3">今日班表 — 點擊簽到／簽退</div>
@@ -196,9 +238,7 @@ const handleManualCheckout = async (checkinId) => {
                         <div className="flex gap-1 flex-shrink-0">
                           {!checkedIn ? (
                             <button onClick={() => handleCheckin(s)}
-                              className="btn btn-primary text-xs py-1 px-2">
-                              簽到
-                            </button>
+                              className="btn btn-primary text-xs py-1 px-2">簽到</button>
                           ) : !checkedOut ? (
                             <>
                               <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -229,28 +269,21 @@ const handleManualCheckout = async (checkinId) => {
                     setManualVolId('')
                     setShowManualList(true)
                   }} />
-                {manualName && showManualList && (
+                {manualName && showManualList && filteredManual.length > 0 && (
                   <div className="absolute z-10 w-full mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
-                    {allVolunteers
-                      .filter(v =>
-                        v.name.includes(manualName) ||
-                        (v.volunteer_no || '').includes(manualName) ||
-                        (manualName.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(manualName.replace(/\D/g, ''))) ||
-                        (v.phone || '').includes(manualName)
-                      )
-                      .map(v => (
-                        <button key={v.id} type="button"
-                          onClick={() => {
-                            setManualName(v.name)
-                            setManualVolId(v.id)
-                            setShowManualList(false)
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
-                          <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
-                          <span>{v.name}</span>
-                          <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
-                        </button>
-                      ))}
+                    {filteredManual.map(v => (
+                      <button key={v.id} type="button"
+                        onClick={() => {
+                          setManualName(v.name)
+                          setManualVolId(v.id)
+                          setShowManualList(false)
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+                        <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
+                        <span>{v.name}</span>
+                        <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -263,71 +296,76 @@ const handleManualCheckout = async (checkinId) => {
             {/* 管理員補簽到 */}
             <div className="card">
               <div className="flex items-center justify-between mb-3">
-                <span className="font-medium text-sm text-gray-700">管理員補簽到</span>
-                {!adminUnlocked && <span className="badge badge-gray text-xs">需管理員權限</span>}
+                <div className="font-medium text-sm text-gray-700">管理員補簽到</div>
+                {!adminUnlocked && (
+                  <button onClick={() => setShowAdminModal(true)} className="btn btn-secondary text-xs">
+                    需管理員權限
+                  </button>
+                )}
               </div>
               {!adminUnlocked ? (
-                <button onClick={() => setShowAdminModal(true)}
-                  className="btn btn-secondary w-full justify-center text-xs">
-                  🔒 解鎖以使用補簽到
-                </button>
+                <div className="text-center py-4 text-gray-400 text-sm">🔒 解鎖以使用補簽到</div>
               ) : (
-                <div className="space-y-2.5">
-                  <div className="relative">
+                <>
+                  <div className="relative mb-2">
                     <input className="input" placeholder="搜尋姓名、編號或電話..."
-                      value={backfillForm.volSearch}
+                      value={backfillName}
                       onChange={e => {
-                        setBackfillForm(f => ({ ...f, volSearch: e.target.value, volunteer_id: '' }))
+                        setBackfillName(e.target.value)
+                        setBackfillVolId('')
                         setShowBackfillList(true)
                       }} />
-                    {backfillForm.volSearch && showBackfillList && (
+                    {backfillName && showBackfillList && filteredBackfill.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
-                        {allVolunteers
-                          .filter(v =>
-                            v.name.includes(backfillForm.volSearch) ||
-                            (v.volunteer_no || '').includes(backfillForm.volSearch) ||
-                            (backfillForm.volSearch.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(backfillForm.volSearch.replace(/\D/g, ''))) ||
-                            (v.phone || '').includes(backfillForm.volSearch)
-                          )
-                          .map(v => (
-                            <button key={v.id} type="button"
-                              onClick={() => {
-                                setBackfillForm(f => ({ ...f, volunteer_id: v.id, volSearch: v.name }))
-                                setShowBackfillList(false)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
-                              <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
-                              <span>{v.name}</span>
-                              <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
-                            </button>
-                          ))}
+                        {filteredBackfill.map(v => (
+                          <button key={v.id} type="button"
+                            onClick={() => {
+                              setBackfillName(v.name)
+                              setBackfillVolId(v.id)
+                              setShowBackfillList(false)
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
+                            <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
+                            <span>{v.name}</span>
+                            <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
+                          </button>
+                        ))}
                       </div>
                     )}
-                    {backfillForm.volunteer_id && (
-                      <p className="text-xs text-green-600 mt-1">✓ 已選擇：{backfillForm.volSearch}</p>
-                    )}
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  {backfillVolId && (
+                    <p className="text-xs text-green-600 mb-2">✓ 已選擇：{backfillName}</p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                     <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">日期</label>
-                      <input type="date" className="input" value={backfillForm.date}
-                        onChange={e => setBackfillForm(f => ({ ...f, date: e.target.value }))} />
+                      <label className="text-xs text-gray-500 block mb-1">日期</label>
+                      <input type="date" className="input" value={backfillDate}
+                        onChange={e => setBackfillDate(e.target.value)} />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">簽到時間</label>
-                      <input type="time" className="input" value={backfillForm.time_in}
-                        onChange={e => setBackfillForm(f => ({ ...f, time_in: e.target.value }))} />
+                      <label className="text-xs text-gray-500 block mb-1">簽到時間（選填）</label>
+                      <select className="input" value={backfillIn}
+                        onChange={e => setBackfillIn(e.target.value)}>
+                        <option value="">— 未填 —</option>
+                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">簽退時間<span className="text-gray-400">(選填)</span></label>
-                      <input type="time" className="input" value={backfillForm.time_out}
-                        onChange={e => setBackfillForm(f => ({ ...f, time_out: e.target.value }))} />
+                      <label className="text-xs text-gray-500 block mb-1">簽退時間（選填）</label>
+                      <select className="input" value={backfillOut}
+                        onChange={e => setBackfillOut(e.target.value)}>
+                        <option value="">— 未填 —</option>
+                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
                     </div>
                   </div>
-                  <button onClick={handleBackfillCheckin} className="btn btn-primary w-full justify-center">送出補簽到</button>
-                </div>
+                  <button onClick={handleBackfill} className="btn btn-primary w-full justify-center">
+                    送出補簽到
+                  </button>
+                </>
               )}
             </div>
+
           </div>
 
           {/* 右欄：今日簽到紀錄 */}
@@ -353,9 +391,7 @@ const handleManualCheckout = async (checkinId) => {
                   <div key={c.id} className="flex items-center gap-2 py-2 border-b border-gray-50">
                     <div className="text-xs text-gray-400 w-20 flex-shrink-0">
                       <div>到 {c.checked_in_at ? format(new Date(c.checked_in_at), 'HH:mm') : '—'}</div>
-                      {c.checked_out_at && (
-                        <div>退 {format(new Date(c.checked_out_at), 'HH:mm')}</div>
-                      )}
+                      {c.checked_out_at && <div>退 {format(new Date(c.checked_out_at), 'HH:mm')}</div>}
                     </div>
                     <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 flex-shrink-0">
                       {c.volunteer_name?.[0]}
@@ -364,14 +400,9 @@ const handleManualCheckout = async (checkinId) => {
                     <span className={`badge ${GROUP_BADGE[c.group_name] || 'badge-gray'} text-[10px] hidden sm:inline-flex`}>
                       {c.group_name}
                     </span>
-                    {c.checked_out_at ? (
-                      <span className="badge badge-gray text-[10px]">已簽退</span>
-                    ) : (
-                      <button onClick={() => handleManualCheckout(c.id)}
-                        className="badge badge-green text-[10px] cursor-pointer hover:bg-red-50 hover:text-red-600 transition-colors">
-                        服務中 → 簽退
-                    </button>
-                    )}
+                    <span className={`badge ${c.checked_out_at ? 'badge-gray' : 'badge-green'} text-[10px] flex-shrink-0`}>
+                      {c.checked_out_at ? '已簽退' : '服務中'}
+                    </span>
                     {adminUnlocked && (
                       <button onClick={() => askDelete(c.id)}
                         className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
@@ -383,7 +414,6 @@ const handleManualCheckout = async (checkinId) => {
               </div>
             )}
           </div>
-
         </div>
       </div>
 
@@ -396,7 +426,7 @@ const handleManualCheckout = async (checkinId) => {
               <button onClick={() => { setShowAdminModal(false); setPwInput(''); setPwError('') }}
                 className="btn btn-ghost p-1"><X className="w-4 h-4" /></button>
             </div>
-            <p className="text-xs text-gray-400 mb-4">輸入管理員密碼以啟用補簽到與刪除功能</p>
+            <p className="text-xs text-gray-400 mb-4">輸入管理員密碼以啟用刪除功能</p>
             <input type="password" className="input mb-2" placeholder="輸入密碼"
               value={pwInput} onChange={e => setPwInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdminLogin()} autoFocus />

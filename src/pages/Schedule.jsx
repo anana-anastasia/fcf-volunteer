@@ -8,16 +8,48 @@ import { ChevronLeft, ChevronRight, X, Save } from 'lucide-react'
 const GROUP_CLASS = {
   行政: 'bg-purple-50 text-purple-700',
   捐髮: 'bg-amber-50 text-amber-700',
-  關懷: 'bg-teal-50 text-teal-700'
+  關懷: 'bg-teal-50 text-teal-700',
+  機動: 'bg-blue-50 text-blue-700',
 }
 const DAYS = ['日', '一', '二', '三', '四', '五', '六']
+
+function searchAndSort(list, keyword) {
+  if (!keyword.trim()) return []
+  const kw = keyword.trim()
+  const numOnly = kw.replace(/\D/g, '')
+  const filtered = list.filter(v =>
+    v.name.includes(kw) ||
+    (v.volunteer_no || '').includes(kw) ||
+    (numOnly && (v.volunteer_no || '').replace(/\D/g, '').includes(numOnly)) ||
+    (v.phone || '').includes(kw)
+  )
+  return filtered.sort((a, b) => {
+    const aNo = parseInt((a.volunteer_no || '').replace(/\D/g, '')) || 99999
+    const bNo = parseInt((b.volunteer_no || '').replace(/\D/g, '')) || 99999
+    const aNoMatch = numOnly && (a.volunteer_no || '').replace(/\D/g, '').includes(numOnly)
+    const bNoMatch = numOnly && (b.volunteer_no || '').replace(/\D/g, '').includes(numOnly)
+    if (aNoMatch && !bNoMatch) return -1
+    if (!aNoMatch && bNoMatch) return 1
+    if (numOnly) {
+      const aExact = (a.volunteer_no || '').replace(/\D/g, '') === numOnly
+      const bExact = (b.volunteer_no || '').replace(/\D/g, '') === numOnly
+      if (aExact && !bExact) return -1
+      if (!aExact && bExact) return 1
+      const aStart = (a.volunteer_no || '').replace(/\D/g, '').startsWith(numOnly)
+      const bStart = (b.volunteer_no || '').replace(/\D/g, '').startsWith(numOnly)
+      if (aStart && !bStart) return -1
+      if (!aStart && bStart) return 1
+    }
+    return aNo - bNo
+  })
+}
 
 export default function Schedule({ toast }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [shifts, setShifts] = useState([])
   const [volunteers, setVolunteers] = useState([])
   const [modal, setModal] = useState(null)
-  const [form, setForm] = useState({ volunteer_id: '', time_start: '09:00', time_end: '12:00' })
+  const [form, setForm] = useState({ volunteer_id: '', volSearch: '', time_start: '09:00', time_end: '12:00' })
   const [dragShift, setDragShift] = useState(null)
 
   const year = currentDate.getFullYear()
@@ -126,6 +158,7 @@ export default function Schedule({ toast }) {
   }
 
   const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月']
+  const filteredVols = searchAndSort(volunteers, form.volSearch || '')
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -141,7 +174,6 @@ export default function Schedule({ toast }) {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-5">
         <div className="card">
-          {/* 月份切換 */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="btn btn-ghost p-1.5">
@@ -159,10 +191,10 @@ export default function Schedule({ toast }) {
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-purple-200 inline-block" />行政</span>
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-200 inline-block" />捐髮</span>
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-teal-200 inline-block" />關懷</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-200 inline-block" />機動</span>
             </div>
           </div>
 
-          {/* 月曆：手機可橫向滑動 */}
           <div className="overflow-x-auto">
             <div className="min-w-[560px]">
               <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-lg overflow-hidden">
@@ -180,8 +212,7 @@ export default function Schedule({ toast }) {
                       className={`bg-white min-h-24 p-1.5 transition-colors ${isToday ? 'bg-blue-50/50' : ''}`}
                       onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('bg-blue-50') }}
                       onDragLeave={e => e.currentTarget.classList.remove('bg-blue-50')}
-                      onDrop={e => handleDrop(day, e)}
-                    >
+                      onDrop={e => handleDrop(day, e)}>
                       <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
                         ${isToday ? 'bg-blue-500 text-white' : 'text-gray-600'}`}>
                         {day.getDate()}
@@ -192,8 +223,7 @@ export default function Schedule({ toast }) {
                           onDragStart={() => setDragShift(s)}
                           onDragEnd={() => setDragShift(null)}
                           onClick={() => openEdit(s)}
-                          className={`text-[11px] px-1.5 py-0.5 rounded mb-0.5 cursor-pointer hover:opacity-80 ${GROUP_CLASS[s.group_name] || 'bg-gray-50 text-gray-600'}`}
-                        >
+                          className={`text-[11px] px-1.5 py-0.5 rounded mb-0.5 cursor-pointer hover:opacity-80 ${GROUP_CLASS[s.group_name] || 'bg-gray-50 text-gray-600'}`}>
                           <span className="font-medium">{s.time_start?.slice(0, 5)}–{s.time_end?.slice(0, 5)}</span>
                           <span className="ml-1">{s.volunteer_name}</span>
                         </div>
@@ -223,62 +253,41 @@ export default function Schedule({ toast }) {
             </div>
             <div className="space-y-3">
               <div>
-  <label className="text-xs font-medium text-gray-600 block mb-1">志工</label>
-  <input className="input mb-1" placeholder="搜尋姓名、編號或電話..."
-    value={form.volSearch || ''}
-    onChange={e => setForm(f => ({ ...f, volSearch: e.target.value, volunteer_id: '' }))} />
-  {form.volSearch && (
-    <div className="border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
-      {volunteers
-        .filter(v =>
-          v.name.includes(form.volSearch) ||
-          (v.volunteer_no || '').includes(form.volSearch) ||
-          (form.volSearch.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(form.volSearch.replace(/\D/g, ''))) ||
-          (v.phone || '').includes(form.volSearch)
-        )
-        .map(v => (
-          <button key={v.id} type="button"
-            onClick={() => setForm(f => ({ ...f, volunteer_id: v.id, volSearch: v.name }))}
-            className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2
-              ${form.volunteer_id === v.id ? 'bg-blue-50 text-blue-600' : ''}`}>
-            <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
-            <span>{v.name}</span>
-            <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
-          </button>
-        ))}
-    </div>
-  )}
-  {form.volunteer_id && !form.volSearch?.includes('搜') && (
-    <p className="text-xs text-green-600 mt-1">
-      ✓ 已選擇：{volunteers.find(v => v.id === form.volunteer_id)?.name}
-    </p>
-  )}
-</div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">志工</label>
+                <input className="input mb-1" placeholder="搜尋姓名、編號或電話..."
+                  value={form.volSearch || ''}
+                  onChange={e => setForm(f => ({ ...f, volSearch: e.target.value, volunteer_id: '', showVolList: true }))} />
+                {form.volSearch && form.showVolList !== false && filteredVols.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                    {filteredVols.map(v => (
+                      <button key={v.id} type="button"
+                        onClick={() => setForm(f => ({ ...f, volunteer_id: v.id, volSearch: v.name, showVolList: false }))}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2
+                          ${form.volunteer_id === v.id ? 'bg-blue-50 text-blue-600' : ''}`}>
+                        <span className="text-gray-400 text-xs w-12">{v.volunteer_no || '—'}</span>
+                        <span>{v.name}</span>
+                        <span className="text-gray-400 text-xs ml-auto">{v.group_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {form.volunteer_id && (
+                  <p className="text-xs text-green-600 mt-1">✓ 已選擇：{form.volSearch}</p>
+                )}
+              </div>
               <div className="flex gap-2 items-center">
-  <div className="flex-1">
-    <label className="text-xs font-medium text-gray-600 block mb-1">開始時間</label>
-    <select className="input" value={form.time_start}
-      onChange={e => setForm(f => ({ ...f, time_start: e.target.value }))}>
-      {Array.from({ length: 48 }, (_, i) => {
-        const h = String(Math.floor(i / 2)).padStart(2, '0')
-        const m = i % 2 === 0 ? '00' : '30'
-        return <option key={i} value={`${h}:${m}`}>{`${h}:${m}`}</option>
-      })}
-    </select>
-  </div>
-  <span className="text-gray-400 mt-5">–</span>
-  <div className="flex-1">
-    <label className="text-xs font-medium text-gray-600 block mb-1">結束時間</label>
-    <select className="input" value={form.time_end}
-      onChange={e => setForm(f => ({ ...f, time_end: e.target.value }))}>
-      {Array.from({ length: 48 }, (_, i) => {
-        const h = String(Math.floor(i / 2)).padStart(2, '0')
-        const m = i % 2 === 0 ? '00' : '30'
-        return <option key={i} value={`${h}:${m}`}>{`${h}:${m}`}</option>
-      })}
-    </select>
-  </div>
-</div>
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-gray-600 block mb-1">開始時間</label>
+                  <input type="time" className="input" value={form.time_start}
+                    onChange={e => setForm(f => ({ ...f, time_start: e.target.value }))} />
+                </div>
+                <span className="text-gray-400 mt-5">–</span>
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-gray-600 block mb-1">結束時間</label>
+                  <input type="time" className="input" value={form.time_end}
+                    onChange={e => setForm(f => ({ ...f, time_end: e.target.value }))} />
+                </div>
+              </div>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={handleSave} className="btn btn-primary flex-1 justify-center">

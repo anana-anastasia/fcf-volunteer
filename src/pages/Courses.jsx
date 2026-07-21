@@ -9,6 +9,37 @@ const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD
 const COLORS = ['#534ab7', '#e24b4a', '#3b6d11', '#1d9e75', '#ba7517', '#378add']
 const TABS = ['課程總覽', '個人紀錄']
 
+function searchAndSort(list, keyword) {
+  if (!keyword.trim()) return []
+  const kw = keyword.trim()
+  const numOnly = kw.replace(/\D/g, '')
+  const filtered = list.filter(v =>
+    v.name.includes(kw) ||
+    (v.volunteer_no || '').includes(kw) ||
+    (numOnly && (v.volunteer_no || '').replace(/\D/g, '').includes(numOnly)) ||
+    (v.phone || '').includes(kw)
+  )
+  return filtered.sort((a, b) => {
+    const aNo = parseInt((a.volunteer_no || '').replace(/\D/g, '')) || 99999
+    const bNo = parseInt((b.volunteer_no || '').replace(/\D/g, '')) || 99999
+    const aNoMatch = numOnly && (a.volunteer_no || '').replace(/\D/g, '').includes(numOnly)
+    const bNoMatch = numOnly && (b.volunteer_no || '').replace(/\D/g, '').includes(numOnly)
+    if (aNoMatch && !bNoMatch) return -1
+    if (!aNoMatch && bNoMatch) return 1
+    if (numOnly) {
+      const aExact = (a.volunteer_no || '').replace(/\D/g, '') === numOnly
+      const bExact = (b.volunteer_no || '').replace(/\D/g, '') === numOnly
+      if (aExact && !bExact) return -1
+      if (!aExact && bExact) return 1
+      const aStart = (a.volunteer_no || '').replace(/\D/g, '').startsWith(numOnly)
+      const bStart = (b.volunteer_no || '').replace(/\D/g, '').startsWith(numOnly)
+      if (aStart && !bStart) return -1
+      if (!aStart && bStart) return 1
+    }
+    return aNo - bNo
+  })
+}
+
 export default function Courses() {
   const [tab, setTab] = useState(0)
   const [courses, setCourses] = useState([])
@@ -111,13 +142,6 @@ export default function Courses() {
     }
   }
 
-  const filterVols = (keyword) => volunteers.filter(v =>
-    v.name.includes(keyword) ||
-    (v.volunteer_no || '').includes(keyword) ||
-    (keyword.replace(/\D/g, '') && (v.volunteer_no || '').replace(/\D/g, '').includes(keyword.replace(/\D/g, ''))) ||
-    (v.phone || '').includes(keyword)
-  )
-
   const completedCount = personalData.filter(c => c.attended).length
   const totalHours = personalData.filter(c => c.attended).reduce((a, c) => a + (c.hours || 0), 0)
 
@@ -136,9 +160,7 @@ export default function Courses() {
             <button key={t} onClick={() => { setTab(i); setSelectedCourse(null) }}
               className={`px-4 py-2 text-sm border-b-2 -mb-px transition-all ${
                 tab === i ? 'text-blue-600 border-blue-500 font-medium' : 'text-gray-500 border-transparent hover:text-gray-700'
-              }`}>
-              {t}
-            </button>
+              }`}>{t}</button>
           ))}
         </div>
 
@@ -205,7 +227,6 @@ export default function Courses() {
             <div className="card">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <span className="text-sm text-gray-500">已報名 {enrollments.length} 人 / 名額 {selectedCourse.max_seats} 人</span>
-                {/* 新增報名搜尋 */}
                 <div className="flex gap-2 items-start">
                   <div className="relative">
                     <input className="input w-44 text-xs" placeholder="搜尋姓名、編號或電話..."
@@ -215,9 +236,9 @@ export default function Courses() {
                         setAddVolId('')
                         setShowAddVolList(true)
                       }} />
-                    {addVolSearch && showAddVolList && (
+                    {addVolSearch && showAddVolList && searchAndSort(volunteers, addVolSearch).length > 0 && (
                       <div className="absolute z-10 w-44 mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
-                        {filterVols(addVolSearch).map(v => (
+                        {searchAndSort(volunteers, addVolSearch).map(v => (
                           <button key={v.id} type="button"
                             onClick={() => {
                               setAddVolId(v.id)
@@ -297,9 +318,9 @@ export default function Courses() {
                   setPersonalData([])
                   setShowPersonalList(true)
                 }} />
-              {personalSearch && showPersonalList && (
+              {personalSearch && showPersonalList && searchAndSort(volunteers, personalSearch).length > 0 && (
                 <div className="absolute z-10 w-full mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
-                  {filterVols(personalSearch).map(v => (
+                  {searchAndSort(volunteers, personalSearch).map(v => (
                     <button key={v.id} type="button"
                       onClick={() => {
                         setPersonalSearch(v.name)
@@ -322,7 +343,7 @@ export default function Courses() {
                   {[['已出席課程', completedCount, '門'], ['累計學習時數', totalHours, '小時'], ['尚未出席', personalData.length - completedCount, '門']].map(([label, val, unit]) => (
                     <div key={label} className="card text-center p-3 md:p-4">
                       <div className="text-xl md:text-2xl font-semibold text-blue-600">{val}</div>
-                      <div className="text-[10px] md:text-xs text-gray-400 mt-0.5">{label}<br className="md:hidden" /><span className="hidden md:inline">（{unit}）</span><span className="md:hidden">（{unit}）</span></div>
+                      <div className="text-[10px] md:text-xs text-gray-400 mt-0.5">{label}（{unit}）</div>
                     </div>
                   ))}
                 </div>
